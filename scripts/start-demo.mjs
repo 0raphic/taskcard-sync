@@ -157,5 +157,13 @@ if (!noOpen) {
   exec(`start "" http://127.0.0.1:${WEB_PORT}`, { shell: 'cmd.exe' });
 }
 
-// 常驻：把子进程的输出留在窗口里
-await new Promise(() => {});
+// 常驻：把子进程的输出留在窗口里（用 interval 保持事件循环，别用不会 resolve 的 await）
+const keepAlive = setInterval(() => {}, 1 << 30);
+function shutdown() {
+  clearInterval(keepAlive);
+  console.log('\n[demo] 正在停止…');
+  stopAll();
+  setTimeout(() => process.exit(0), 600);
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
