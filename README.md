@@ -94,9 +94,13 @@ tools/              下载 / 启动 PocketBase、CDP 截图（shot.mjs）
 从 `.env.local.example` 复制。所有项都可缺省：
 
 - `DEEPSEEK_API_KEY`：录入页「解析成任务」走模型；不填则走本地规则（标题、截止、用时、材料、备注都认）
-- `DEEPSEEK_VISION_MODEL`：能读图的模型名；不填时「上传照片识别」会明确提示未接
+- `DEEPSEEK_MODEL`：文字解析用的模型，默认 `deepseek-flash`
+- `DEEPSEEK_VISION_MODEL`：能读图的模型名，填 `deepseek-flash` 即可（该模型支持图片输入）；
+  不填时「上传照片识别」会明确提示未接
 - `PB_ADMIN_EMAIL/PASSWORD`：seed 建表用的本地管理员，仅本机
 - `PORT`：网页端口，默认 8088
+
+改了 `.env.local` 要重启网页服务才生效（`start-demo.cmd` 关掉重开）。
 
 ## 本机验收记录（最后一次跑）
 
@@ -110,6 +114,7 @@ tools/              下载 / 启动 PocketBase、CDP 截图（shot.mjs）
 | 双面 PDF | 通过（2 页：正面 8 张 + 背面 8 张复盘，长边镜像对齐） |
 | 手机尺寸（390px）看板 / 全部任务 | 通过（分组、筛选、搜索无溢出） |
 | 一键启动冷启动 | 通过（换掉两个服务后双击脚本，自动起 PB + 网页并打印地址） |
+| 照片 OCR（配 Key 后） | 通过（一张卡片照片 1.6s 读出标题/截止/用时/材料/备注，存入后生成短码） |
 
 ## 现场要点
 

@@ -4,15 +4,18 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import 'dotenv/config';
+import dotenv from 'dotenv';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
+// 先读 .env.local（本机私有），再用 .env 兜底；已存在的环境变量优先（真实 env > 文件）
+dotenv.config({ path: [path.join(ROOT, '.env.local'), path.join(ROOT, '.env')], quiet: true });
+
 const DIST = path.join(ROOT, 'web', 'dist');
 const PORT = Number(process.env.PORT || 8088);
 const PB_URL = process.env.PB_URL || 'http://127.0.0.1:8090';
 const DS_BASE = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '');
 const DS_KEY = process.env.DEEPSEEK_API_KEY || '';
-const DS_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+const DS_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-flash';
 const DS_VISION_MODEL = process.env.DEEPSEEK_VISION_MODEL || '';
 
 const app = express();
