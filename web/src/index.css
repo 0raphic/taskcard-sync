@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  --color-mat: #232522;
+  --color-mat-soft: #2c2f2b;
+  --color-paper: #fbfaf6;
+  --color-paper-dim: #f2f0e8;
+  --color-ink: #17181a;
+  --color-ink-soft: #5b5f58;
+  --color-rule: #d9d6cd;
+  --color-seal: #b23a2f;
+  --color-moss: #3f6b4a;
+  --color-amber: #a86a15;
+
+  --font-sans: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC",
+    system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-mat text-paper font-sans antialiased;
+    font-feature-settings: "tnum" 1;
+  }
+  ::selection {
+    @apply bg-seal text-paper;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-seal);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* 卡片：裁剪线是虚线的，和打印出来的纸卡一致 */
+  .trim {
+    border: 1px dashed color-mix(in srgb, var(--color-ink) 30%, transparent);
+  }
+  /* 纸卡浮起：深色垫子上要靠影子分层 */
+  .paper-lift {
+    box-shadow:
+      0 1px 0 color-mix(in srgb, var(--color-ink) 16%, transparent),
+      0 20px 32px -24px rgba(0, 0, 0, 0.9);
+    transition: box-shadow 200ms ease;
+  }
+  .paper-lift:hover {
+    box-shadow:
+      0 1px 0 color-mix(in srgb, var(--color-ink) 18%, transparent),
+      0 26px 42px -24px rgba(0, 0, 0, 0.95);
+  }
+  /* 手写线 */
+  .ruled {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 1.55rem,
+      color-mix(in srgb, var(--color-ink) 14%, transparent) 1.55rem,
+      color-mix(in srgb, var(--color-ink) 14%, transparent) calc(1.55rem + 1px)
+    );
+  }
+}

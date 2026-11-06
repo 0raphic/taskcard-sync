@@ -1,0 +1,105 @@
+{
+  "base_url": "http://127.0.0.1:8088",
+  "tasks": [
+    {
+      "id": "tsk000000000001",
+      "code": "a7K2m9",
+      "kind": "short",
+      "title": "打印 8 张任务卡样张",
+      "due": "11-07",
+      "estimate_min": 40,
+      "description": "A4 双面，1/8 尺寸，二维码 ≥15mm",
+      "materials": "打印店、U盘",
+      "notes": "先试印一张，量二维码尺寸"
+    },
+    {
+      "id": "tsk000000000002",
+      "code": "Qp4Xz1",
+      "kind": "short",
+      "title": "手机扫码打开落地页",
+      "due": "11-07",
+      "estimate_min": 15,
+      "description": "用自带相机扫，别用网页内扫",
+      "materials": "手机、热点",
+      "notes": "确认和电脑同网段"
+    },
+    {
+      "id": "tsk000000000003",
+      "code": "vB8nR3",
+      "kind": "short",
+      "title": "两个窗口验证实时同步",
+      "due": "11-07",
+      "estimate_min": 20,
+      "description": "A 窗口改状态，B 窗口 1 秒内变",
+      "materials": "两个浏览器窗口",
+      "notes": "SSE 断线会自动重连"
+    },
+    {
+      "id": "tsk000000000004",
+      "code": "Lm5Ty7",
+      "kind": "short",
+      "title": "写三分钟演示稿并背下来",
+      "due": "11-08",
+      "estimate_min": 60,
+      "description": "掐表练三遍，卡壳的地方改稿",
+      "materials": "计时器",
+      "notes": "第一句必须抓人"
+    },
+    {
+      "id": "tsk000000000005",
+      "code": "Hs2Wd6",
+      "kind": "short",
+      "title": "准备断网兜底录屏",
+      "due": "11-08",
+      "estimate_min": 30,
+      "description": "完整流程录一遍，存本地",
+      "materials": "录屏工具",
+      "notes": "现场网挂了就播视频"
+    },
+    {
+      "id": "tsk000000000006",
+      "code": "Cx9Kp4",
+      "kind": "short",
+      "title": "检查防火墙放行 8088/8090",
+      "due": "11-08",
+      "estimate_min": 10,
+      "description": "换一台手机实测，别用本机测",
+      "materials": "备用手机",
+      "notes": "最容易被忽略的一步"
+    },
+    {
+      "id": "tsk000000000007",
+      "code": "Zr3Nb8",
+      "kind": "long",
+      "title": "做出可演示的任务卡片系统",
+      "start": "11-07",
+      "due": "11-12",
+      "goal": "创客松现场 3 分钟跑通纸卡到数字的闭环",
+      "milestones": [
+        "后端与表结构",
+        "扫码落地页",
+        "实时同步",
+        "打印实物卡",
+        "排练与兜底"
+      ],
+      "resources": "PocketBase、React、DeepSeek API",
+      "progress": 45
+    },
+    {
+      "id": "tsk000000000008",
+      "code": "Yf6Jm2",
+      "kind": "long",
+      "title": "把纸卡习惯延续到赛后",
+      "start": "11-13",
+      "due": "12-31",
+      "goal": "每周固定复盘一次，长期卡不超过 3 张",
+      "milestones": [
+        "赛后第一周试用",
+        "根据反馈改字段",
+        "决定是否做 App"
+      ],
+      "resources": "自己的耐心",
+      "progress": 10
+    }
+  ]
+}

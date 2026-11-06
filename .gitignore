@@ -1,0 +1,27 @@
+# deps
+node_modules/
+web/node_modules/
+
+# build output
+web/dist/
+
+# secrets
+.env.local
+.env
+
+# PocketBase runtime data & binary
+server/pocketbase/pb_data/
+server/pocketbase/pocketbase.exe
+server/pocketbase/pocketbase
+*.zip
+
+# logs / os junk
+*.log
+.DS_Store
+Thumbs.db
+
+.pnpm-store
+
+# 本地验收产物（截图、CDP 配置）
+.shots/
+.edge-profile/
