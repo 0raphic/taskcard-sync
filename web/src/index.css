@@ -47,6 +47,23 @@
   .trim {
     border: 1px dashed color-mix(in srgb, var(--color-ink) 30%, transparent);
   }
+  /* 完成章：盖在纸卡上，抬手那一下的放大回弹 */
+  .stamp {
+    border: 2px solid color-mix(in srgb, var(--color-seal) 55%, transparent);
+    border-radius: 3px;
+    padding: 0.05rem 0.45rem;
+    color: color-mix(in srgb, var(--color-seal) 78%, transparent);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-indent: 0.22em;
+    line-height: 1.2;
+    white-space: nowrap;
+    transform: rotate(-8deg);
+    mix-blend-mode: multiply;
+    animation: stamp-in 260ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  }
+
   /* 纸卡浮起：深色垫子上要靠影子分层 */
   .paper-lift {
     box-shadow:
@@ -68,5 +85,15 @@
       color-mix(in srgb, var(--color-ink) 14%, transparent) 1.55rem,
       color-mix(in srgb, var(--color-ink) 14%, transparent) calc(1.55rem + 1px)
     );
+  }
+}
+
+/* 只动透明度：带 mix-blend + 缩放动画在无头浏览器里会留下重影 */
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.9;
   }
 }

@@ -8,7 +8,13 @@ export function TaskSheet({ task, code, scans }: { task: Task; code?: string; sc
         <span className="pt-1 text-[10px] tracking-[0.22em] text-ink-soft">
           {task.kind === 'short' ? '短期任务' : '长期任务'}
         </span>
-        <StatusPill status={task.status} />
+        {task.status === 'done' ? (
+          <span aria-hidden className="stamp shrink-0">
+            完成
+          </span>
+        ) : (
+          <StatusPill status={task.status} />
+        )}
       </div>
 
       <h1 className="mt-3 text-[24px] font-semibold leading-snug tracking-tight">{task.title}</h1>
@@ -64,15 +70,6 @@ export function TaskSheet({ task, code, scans }: { task: Task; code?: string; sc
           <span>{code}</span>
           <span>{scans ? `被扫 ${scans} 次` : ''}</span>
         </div>
-      )}
-
-      {task.status === 'done' && (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute right-4 top-16 -rotate-12 border-[3px] border-seal/70 px-3 py-1 text-[22px] font-bold tracking-[0.3em] text-seal/70"
-        >
-          完成
-        </span>
       )}
     </article>
   );

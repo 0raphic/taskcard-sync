@@ -8,7 +8,8 @@
     "start": "node server/index.mjs",
     "pb": "node tools/run-pocketbase.mjs",
     "seed": "node seed/seed.mjs",
-    "cards": "python scripts/gen_cards.py"
+    "cards": "python scripts/gen_cards.py",
+    "demo": "node scripts/start-demo.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",

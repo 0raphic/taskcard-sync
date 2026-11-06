@@ -11,12 +11,23 @@
 
 - 看板：逾期 / 今天 / 接下来 / 长期目标 分组，短卡看截止与用时，长卡看进度条
 - 扫码落地页 `/t/<短码>`：一张纸卡的样子 + 三个按钮（做完了 / 正在进行 / 先搁置），点完盖「完成」红章
+- 长期卡落地页：现场改进度（−10% / ＋10%）、写一句进展记到详情里
 - 实时同步：A 窗口点「做完了」→ B 窗口看板 1 秒内出现「已完成」分组，不刷新
 - 录入：粘一段文字 → 拆出标题/截止/用时/材料/备注 → 存库并自动生成 6 位短码
 - 打印：`cards/cards.pdf` 一页 8 张，二维码实测解码为 `http://192.168.0.108:8088/t/<短码>`
-  （IP 变了要重新生成，见下）
+  （IP 变了要重新生成，见下）；`cards/cards-double.pdf` 是双面版
+- PWA：带 manifest 和图标，手机浏览器「添加到主屏幕」后像个 App（没有 Service Worker，离线打不开）
 
-## 30 秒跑起来
+## 最省事：双击启动
+
+```
+start-demo.cmd
+```
+
+它会依次检查/启动 PocketBase、数据库空了就自动导入演示数据、启动网页服务器，然后打开浏览器，
+并在窗口里打印「本机地址 / 手机地址 / 扫码测试链接」。关掉窗口即全部停止（也可以 `pnpm demo`）。
+
+## 30 秒跑起来（手动版）
 
 ```bash
 pnpm install                       # 装依赖（store 指到仓库内，见 .npmrc）
@@ -53,19 +64,27 @@ python scripts/gen_cards.py --input cards/tasks.json --output cards/cards.pdf \
 
 - `--base-url` 决定二维码里的地址：**现场要写笔记本的局域网/热点 IP**，不要写 127.0.0.1
   （本机现在是 WLAN `192.168.0.108`，换网络后先 `ipconfig` 看一眼）
-- `--double-sided --flip long|short` 可出双面（正面卡片、背面复盘）
+- 双面（正面卡片 + 背面复盘，翻页按长边镜像，实测 8 张全部对齐）：
+
+  ```bash
+  python scripts/gen_cards.py --input cards/tasks.json --output cards/cards-double.pdf \
+    --double-sided --flip long --base-url http://192.168.0.108:8088
+  ```
+
 - 输出 `cards/codes.json`：短码 → 任务 ID，和数据库 `short_links` 对应
 - 打出来先量二维码：不小于 15×15mm；用手机**自带相机**扫，不要用网页里调摄像头
 
 ## 目录
 
 ```
-web/                前端（页面 / 组件 / 数据订阅）
+start-demo.cmd      一键启动（双击）
+web/                前端（页面 / 组件 / 数据订阅 / PWA manifest 与图标）
 server/index.mjs    生产服务器：托管 dist + 代理 PocketBase + /ds-api 结构化接口
 server/pocketbase/  PocketBase 可执行文件、pb_data、pb_migrations（数据与迁移不入库）
 seed/seed.mjs       建表 + 导入卡片数据（幂等）
 scripts/gen_cards.py  A4 卡片 PDF 生成
-cards/              tasks.json（卡片内容）、cards.pdf、codes.json
+scripts/start-demo.mjs  一键启动的实现（检查端口 / 起服务 / 打印地址）
+cards/              tasks.json（卡片内容）、cards.pdf、cards-double.pdf、codes.json
 docs/demo-script.md 三分钟讲稿 + 现场保险清单
 tools/              下载 / 启动 PocketBase、CDP 截图（shot.mjs）
 ```
@@ -78,6 +97,19 @@ tools/              下载 / 启动 PocketBase、CDP 截图（shot.mjs）
 - `DEEPSEEK_VISION_MODEL`：能读图的模型名；不填时「上传照片识别」会明确提示未接
 - `PB_ADMIN_EMAIL/PASSWORD`：seed 建表用的本地管理员，仅本机
 - `PORT`：网页端口，默认 8088
+
+## 本机验收记录（最后一次跑）
+
+| 项目 | 结果 |
+|---|---|
+| 扫码 → 改状态 → 看板实时 | 通过（1.6s 内出现「已完成」，无刷新） |
+| 长期卡落地页 −10/＋10 | 通过（45 → 55，数据库与页面一致） |
+| 落地页「记一笔」 | 通过（progress_logs +1，详情页可见） |
+| 文字录入 → 存库 → 短码 | 通过（跳 `/tasks/<id>`，详情显示短码） |
+| 8 个二维码解码 | 通过（OpenCV 解码全部 8 个为 `http://192.168.0.108:8088/t/<短码>`） |
+| 双面 PDF | 通过（2 页：正面 8 张 + 背面 8 张复盘，长边镜像对齐） |
+| 手机尺寸（390px）看板 / 全部任务 | 通过（分组、筛选、搜索无溢出） |
+| 一键启动冷启动 | 通过（换掉两个服务后双击脚本，自动起 PB + 网页并打印地址） |
 
 ## 现场要点
 
@@ -104,3 +136,4 @@ tools/              下载 / 启动 PocketBase、CDP 截图（shot.mjs）
 - 照片 OCR 依赖视觉模型；本机没装 tesseract，走的是模型读图
 - 没有登录：局域网演示用，别放到公网
 - 移动端就是同一套网页；Flutter 客户端只是下一步，不是现在
+- PWA 目前只有 manifest + 图标（能「添加到主屏幕」），没有 Service Worker，断网打不开页面

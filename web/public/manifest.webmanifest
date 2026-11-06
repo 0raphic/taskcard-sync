@@ -1,0 +1,17 @@
+{
+  "name": "任务卡片 · Task Card",
+  "short_name": "任务卡片",
+  "description": "一叠能打印的纸卡 + 一个网页：扫码改状态，看板实时同步",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#232522",
+  "theme_color": "#232522",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
