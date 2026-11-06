@@ -4,6 +4,7 @@ import { Board } from './pages/Board';
 import { Capture } from './pages/Capture';
 import { Detail } from './pages/Detail';
 import { Landing } from './pages/Landing';
+import { Settings } from './pages/Settings';
 import { TaskList } from './pages/TaskList';
 
 export function App() {
@@ -18,6 +19,7 @@ export function App() {
   if (detail) page = <Detail id={decodeURIComponent(detail[1])} />;
   else if (path.startsWith('/tasks')) page = <TaskList />;
   else if (path.startsWith('/capture')) page = <Capture />;
+  else if (path.startsWith('/settings')) page = <Settings />;
   else if (path !== '/' && path !== '') page = <NotFound path={path} />;
 
   return <Shell>{page}</Shell>;

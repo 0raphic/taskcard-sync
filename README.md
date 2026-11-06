@@ -84,23 +84,41 @@ server/pocketbase/  PocketBase 可执行文件、pb_data、pb_migrations（数�
 seed/seed.mjs       建表 + 导入卡片数据（幂等）
 scripts/gen_cards.py  A4 卡片 PDF 生成
 scripts/start-demo.mjs  一键启动的实现（检查端口 / 起服务 / 打印地址）
+scripts/set-key.mjs     命令行写 DeepSeek Key（也可以直接在网页「设置」里填）
 cards/              tasks.json（卡片内容）、cards.pdf、cards-double.pdf、codes.json
+android/            手机 App（WebView 外壳，里面就是同一个网页）
+dist/taskcard.apk   已经打包好的手机安装包
 docs/demo-script.md 三分钟讲稿 + 现场保险清单
-tools/              下载 / 启动 PocketBase、CDP 截图（shot.mjs）
+tools/              下载 / 启动 PocketBase、CDP 截图、Android SDK 与 APK 打包脚本
 ```
 
-## 配置（.env.local）
+## 手机 App（可选，但演示最稳）
 
-从 `.env.local.example` 复制。所有项都可缺省：
+`dist/taskcard.apk` 直接传到手机安装（第一次要允许「安装未知来源应用」）。
+装好后第一次打开会问服务器地址，填电脑窗口里「手机打开」那一行，例如
+`http://192.168.0.108:8088`。右下角「⋯」可以「刷新」「换服务器地址」「用浏览器打开」。
 
-- `DEEPSEEK_API_KEY`：录入页「解析成任务」走模型；不填则走本地规则（标题、截止、用时、材料、备注都认）
-- `DEEPSEEK_MODEL`：文字解析用的模型，默认 `deepseek-flash`
-- `DEEPSEEK_VISION_MODEL`：能读图的模型名，填 `deepseek-flash` 即可（该模型支持图片输入）；
-  不填时「上传照片识别」会明确提示未接
+它就是个浏览器外壳：页面、数据、实时同步和电脑上完全一样，只是可以像 App 一样放在桌面。
+
+重新打包（改了网页不用重打，改了 App 外壳才要）：
+
+```bash
+node tools/install-android.mjs   # 第一次：装 Android SDK 到 D:\Android\Sdk
+node tools/build-apk.mjs         # 输出 dist/taskcard.apk
+```
+
+## 配置（Key 存在数据库里）
+
+打开网页右上角「设置」，填 DeepSeek Key，保存即可，**不用重启**。
+
+- Key 存在本机 PocketBase 的 `app_settings` 表，规则锁死，只有服务端用管理员身份读；
+  网页上只显示 `sk-13…2684` 这种前后几位。
+- `deepseek-flash`：文字解析 + 看图（照片识别）都能用；`deepseek-v4-pro` 只能文字。
+- 命令行等价写法：`node scripts/set-key.mjs sk-xxxx`
+- `.env.local` 里的同名项仍然可用，但**优先级低于网页设置**；不配 Key 时「解析成任务」走本地规则
+  （标题、截止、用时、材料、备注都认），照片识别会提示未接。
 - `PB_ADMIN_EMAIL/PASSWORD`：seed 建表用的本地管理员，仅本机
 - `PORT`：网页端口，默认 8088
-
-改了 `.env.local` 要重启网页服务才生效（`start-demo.cmd` 关掉重开）。
 
 ## 本机验收记录（最后一次跑）
 
@@ -115,6 +133,7 @@ tools/              下载 / 启动 PocketBase、CDP 截图（shot.mjs）
 | 手机尺寸（390px）看板 / 全部任务 | 通过（分组、筛选、搜索无溢出） |
 | 一键启动冷启动 | 通过（换掉两个服务后双击脚本，自动起 PB + 网页并打印地址） |
 | 照片 OCR（配 Key 后） | 通过（一张卡片照片 1.6s 读出标题/截止/用时/材料/备注，存入后生成短码） |
+| 手机 App（模拟器 Android 15） | 通过（装 `dist/taskcard.apk`，填 LAN 地址后加载看板，标题不被状态栏遮挡，⋯ 菜单可刷新/换地址） |
 
 ## 现场要点
 

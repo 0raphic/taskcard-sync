@@ -15,8 +15,55 @@ const PORT = Number(process.env.PORT || 8088);
 const PB_URL = process.env.PB_URL || 'http://127.0.0.1:8090';
 const DS_BASE = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/$/, '');
 const DS_KEY = process.env.DEEPSEEK_API_KEY || '';
-const DS_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-flash';
+const DS_MODEL = process.env.DEEPSEEK_MODEL || '';
 const DS_VISION_MODEL = process.env.DEEPSEEK_VISION_MODEL || '';
+const DEFAULT_MODEL = 'deepseek-flash';
+
+// DeepSeek 配置来源：进程环境变量 > PocketBase app_settings 表（服务端用管理员 token 读）
+// 这样用户在网页/脚本里设置一次，重启也不丢，不需要改 .env.local
+const PB_ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL || 'admin@taskcard.local';
+const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD || 'taskcard12345';
+let adminCache = { token: '', at: 0 };
+let llmCache = { at: 0, key: '', model: DEFAULT_MODEL, vision: '' };
+
+async function adminToken() {
+  if (adminCache.token && Date.now() - adminCache.at < 10 * 60_000) return adminCache.token;
+  const r = await fetch(`${PB_URL}/api/collections/_superusers/auth-with-password`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ identity: PB_ADMIN_EMAIL, password: PB_ADMIN_PASSWORD }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.token) throw new Error('PB 管理员登录失败');
+  adminCache = { token: j.token, at: Date.now() };
+  return j.token;
+}
+
+async function llmConfig({ fresh = false } = {}) {
+  if (!fresh && llmCache.at && Date.now() - llmCache.at < 5000) return llmCache;
+  let key = '';
+  let model = '';
+  let vision = '';
+  try {
+    const token = await adminToken();
+    const r = await fetch(`${PB_URL}/api/collections/app_settings/records?perPage=1`, {
+      headers: { authorization: token },
+    });
+    const j = await r.json().catch(() => ({}));
+    const it = j.items?.[0] || {};
+    key = it.deepseek_api_key || '';
+    model = it.deepseek_model || '';
+    vision = it.deepseek_vision_model || '';
+  } catch {
+    /* 读不到就按未配置处理 */
+  }
+  // 数据库里的设置优先（网页里改），没有再用进程环境变量，最后用默认
+  if (!key) key = DS_KEY;
+  if (!model) model = DS_MODEL || DEFAULT_MODEL;
+  if (!vision) vision = DS_VISION_MODEL;
+  llmCache = { at: Date.now(), key, model, vision };
+  return llmCache;
+}
 
 const app = express();
 
@@ -124,9 +171,9 @@ function localParse(text) {
   };
 }
 
-async function callDeepSeek(messages, model = DS_MODEL) {
-  if (!DS_KEY) {
-    const err = new Error('服务端没有配置 DEEPSEEK_API_KEY（见 .env.local.example）');
+async function callDeepSeek(messages, { key, model } = {}) {
+  if (!key) {
+    const err = new Error('服务端没有配置 DeepSeek Key（网页「设置」里填一次，或 .env.local）');
     err.status = 503;
     throw err;
   }
@@ -134,10 +181,10 @@ async function callDeepSeek(messages, model = DS_MODEL) {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${DS_KEY}`,
+      authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({
-      model,
+      model: model || DEFAULT_MODEL,
       messages,
       temperature: 0.2,
       response_format: { type: 'json_object' },
@@ -167,14 +214,18 @@ async function callDeepSeek(messages, model = DS_MODEL) {
 app.post('/ds-api/structure', async (req, res) => {
   const text = String(req.body?.text ?? '').trim();
   if (!text) return res.status(400).json({ ok: false, error: '没有文字可解析' });
-  if (!DS_KEY) {
+  const cfg = await llmConfig();
+  if (!cfg.key) {
     return res.json({ ok: true, task: localParse(text), fallback: true });
   }
   try {
-    const task = await callDeepSeek([
-      { role: 'system', content: SYSTEM },
-      { role: 'user', content: text },
-    ]);
+    const task = await callDeepSeek(
+      [
+        { role: 'system', content: SYSTEM },
+        { role: 'user', content: text },
+      ],
+      cfg,
+    );
     res.json({ ok: true, task });
   } catch (e) {
     res.status(e.status || 500).json({ ok: false, error: e.message });
@@ -186,11 +237,11 @@ app.post('/ds-api/ocr', async (req, res) => {
   if (!image.startsWith('data:image/')) {
     return res.status(400).json({ ok: false, error: '需要 data:image/... 的图片' });
   }
-  if (!DS_VISION_MODEL) {
+  const cfg = await llmConfig();
+  if (!cfg.vision || !cfg.key) {
     return res.status(501).json({
       ok: false,
-      error:
-        '照片识别还没接上：在 .env.local 里配 DEEPSEEK_VISION_MODEL（能读图的模型）即可；现在请先把纸卡上的字敲进上面的输入框。',
+      error: '照片识别还没接上：在网页「设置」里填 DeepSeek Key 和看图模型（deepseek-flash）即可。',
     });
   }
   try {
@@ -205,7 +256,7 @@ app.post('/ds-api/ocr', async (req, res) => {
           ],
         },
       ],
-      DS_VISION_MODEL,
+      { key: cfg.key, model: cfg.vision },
     );
     res.json({ ok: true, task, text: task.description || '' });
   } catch (e) {
@@ -221,13 +272,56 @@ app.get('/ds-api/health', async (_req, res) => {
   } catch {
     pb = 'down';
   }
+  const cfg = await llmConfig();
   res.json({
     ok: true,
     pb,
-    deepseek: DS_KEY ? 'configured' : 'missing-key',
-    vision: DS_VISION_MODEL || null,
+    deepseek: cfg.key ? 'configured' : 'missing-key',
+    model: cfg.key ? cfg.model : null,
+    vision: cfg.vision || null,
     dist: existsSync(DIST),
   });
+});
+
+// 设置：Key 存 PocketBase（app_settings，规则锁死），只有服务端能读写；网页只看到「已配置」
+app.get('/ds-api/settings', async (_req, res) => {
+  const cfg = await llmConfig({ fresh: true });
+  const hint = cfg.key ? `${cfg.key.slice(0, 5)}…${cfg.key.slice(-4)}` : '';
+  res.json({ ok: true, configured: Boolean(cfg.key), key_hint: hint, model: cfg.model, vision: cfg.vision });
+});
+
+app.post('/ds-api/settings', async (req, res) => {
+  const body = req.body || {};
+  const patch = {};
+  if (typeof body.api_key === 'string') {
+    const v = body.api_key.trim();
+    if (v && !v.startsWith('sk-')) return res.status(400).json({ ok: false, error: 'Key 一般以 sk- 开头，检查一下' });
+    patch.deepseek_api_key = v;
+  }
+  if (typeof body.model === 'string' && body.model.trim()) patch.deepseek_model = body.model.trim();
+  if (typeof body.vision === 'string') patch.deepseek_vision_model = body.vision.trim();
+  if (!Object.keys(patch).length) return res.status(400).json({ ok: false, error: '没有要保存的内容' });
+  try {
+    const token = await adminToken();
+    const list = await fetch(`${PB_URL}/api/collections/app_settings/records?perPage=1`, {
+      headers: { authorization: token },
+    }).then((r) => r.json());
+    const existing = list.items?.[0];
+    const url = existing
+      ? `${PB_URL}/api/collections/app_settings/records/${existing.id}`
+      : `${PB_URL}/api/collections/app_settings/records`;
+    const r = await fetch(url, {
+      method: existing ? 'PATCH' : 'POST',
+      headers: { 'content-type': 'application/json', authorization: token },
+      body: JSON.stringify(patch),
+    });
+    if (!r.ok) throw new Error(`保存失败 HTTP ${r.status}`);
+    llmCache = { at: 0, key: '', model: DEFAULT_MODEL, vision: '' };
+    const cfg = await llmConfig({ fresh: true });
+    res.json({ ok: true, configured: Boolean(cfg.key), model: cfg.model, vision: cfg.vision });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 if (existsSync(DIST)) {

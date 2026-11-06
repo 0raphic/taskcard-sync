@@ -132,6 +132,17 @@ await ensureCollection('progress_logs', [
   { name: 'delta', type: 'number' },
 ]);
 
+// 3.5 服务端配置（DeepSeek Key 等）：规则锁死，只有服务端用管理员 token 读写
+await ensureCollection(
+  'app_settings',
+  [
+    { name: 'deepseek_api_key', type: 'text', max: 300 },
+    { name: 'deepseek_model', type: 'text', max: 80 },
+    { name: 'deepseek_vision_model', type: 'text', max: 80 },
+  ],
+  { listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null },
+);
+
 // 4. 自引用：短期卡关联长期卡
 const fresh = await api(`/api/collections/${tasksCol.id}`, { token });
 await api(`/api/collections/${tasksCol.id}`, {

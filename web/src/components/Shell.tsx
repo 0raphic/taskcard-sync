@@ -5,6 +5,7 @@ const NAV = [
   { to: '/', label: '看板' },
   { to: '/tasks', label: '全部任务' },
   { to: '/capture', label: '录入' },
+  { to: '/settings', label: '设置' },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
