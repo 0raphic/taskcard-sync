@@ -71,10 +71,11 @@ async function llmConfig({ fresh = false } = {}) {
 
 const app = express();
 
-// 写操作口令：开启后，所有改数据的请求（前端 fetch 与 PocketBase 客户端）都要带 x-write-token。
-// 只读接口和「扫码识别」不受限——否则手机上每扫一次都要输口令。
+// 写操作口令：默认关闭（等账号系统接管）。需要临时开就设 WRITE_PASSCODE=on。
+const WRITE_PASSCODE_ON = process.env.WRITE_PASSCODE === 'on';
 const WRITE_FREE = new Set(['/api/realtime', '/ds-api/health', '/ds-api/net', '/ds-api/scan', '/ds-api/passcode', '/ds-api/structure', '/ds-api/ocr']);
 app.use((req, res, next) => {
+  if (!WRITE_PASSCODE_ON) return next();
   const method = (req.method || 'GET').toUpperCase();
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next();
   const p = req.path || '';
@@ -395,6 +396,10 @@ async function savePass(code) {
 }
 
 app.get('/ds-api/passcode', async (_req, res) => {
+  if (!WRITE_PASSCODE_ON) {
+    res.json({ ok: true, enabled: false, disabled: true });
+    return;
+  }
   const p = await passInfo({ fresh: true });
   res.json({ ok: true, enabled: p.enabled });
 });

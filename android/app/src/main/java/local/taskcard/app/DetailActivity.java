@@ -22,6 +22,7 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class DetailActivity extends AppCompatActivity {
@@ -29,7 +30,9 @@ public class DetailActivity extends AppCompatActivity {
     private static final String EXTRA_ID = "id";
     private String id;
     private Task task;
-    private EditText title, due, estimate, priority, dod, start, materials, notes, weekly;
+    private EditText title, due, estimate, priority, dod, start, materials, notes, weekly, tags;
+    private LinearLayout checklistBox;
+    private JSONArray checklist = new JSONArray();
     private ChipGroup statusGroup;
     private SeekBar progressBar;
     private TextView progressLabel;
@@ -76,6 +79,18 @@ public class DetailActivity extends AppCompatActivity {
             chip.setText(s[0]);
             chip.setTag(s[1]);
             chip.setCheckable(true);
+            int onSurface = Ui.attr(this, com.google.android.material.R.attr.colorOnSurface);
+            int onSurfaceVariant = Ui.attr(this, com.google.android.material.R.attr.colorOnSurfaceVariant);
+            int surfaceColor = Ui.attr(this, com.google.android.material.R.attr.colorSurface);
+            chip.setChipBackgroundColor(new android.content.res.ColorStateList(
+                    new int[][]{{android.R.attr.state_checked}, {}},
+                    new int[]{onSurface, 0x00FFFFFF}));
+            chip.setTextColor(new android.content.res.ColorStateList(
+                    new int[][]{{android.R.attr.state_checked}, {}},
+                    new int[]{surfaceColor, onSurfaceVariant}));
+            chip.setChipStrokeWidth(Ui.dp(this, 1));
+            chip.setChipStrokeColor(android.content.res.ColorStateList.valueOf(
+                    Ui.attr(this, com.google.android.material.R.attr.colorOutline)));
             statusGroup.addView(chip);
         }
         body.addView(statusGroup);
@@ -91,6 +106,11 @@ public class DetailActivity extends AppCompatActivity {
         weekly = field(body, "每周投入（小时，长期卡）", InputType.TYPE_CLASS_NUMBER);
         materials = field(body, "材料", InputType.TYPE_CLASS_TEXT);
         notes = field(body, "备注", InputType.TYPE_CLASS_TEXT);
+        tags = field(body, "标签（逗号分隔）", InputType.TYPE_CLASS_TEXT);
+
+        body.addView(Ui.label(this, "清单"));
+        checklistBox = Ui.column(this);
+        body.addView(checklistBox);
 
         body.addView(Ui.label(this, "进度"));
         progressLabel = Ui.label(this, "0%");
@@ -183,6 +203,9 @@ public class DetailActivity extends AppCompatActivity {
         weekly.setText(task.weeklyHours > 0 ? String.valueOf(task.weeklyHours) : "");
         materials.setText(task.materials);
         notes.setText(task.notes);
+        tags.setText(task.tags);
+        checklist = task.checklist != null ? task.checklist : new JSONArray();
+        renderChecklist();
         progressBar.setProgress(task.progress);
         progressLabel.setText(task.progress + "%");
         progressBar.setVisibility("long".equals(task.kind) ? SeekBar.VISIBLE : SeekBar.GONE);
@@ -201,6 +224,7 @@ public class DetailActivity extends AppCompatActivity {
         b.put("dod", dod.getText().toString().trim());
         b.put("materials", materials.getText().toString().trim());
         b.put("notes", notes.getText().toString().trim());
+        b.put("tags", tags.getText().toString().trim());
         String est = estimate.getText().toString().trim();
         b.put("estimate_min", est.isEmpty() ? 0 : Integer.parseInt(est));
         String wk = weekly.getText().toString().trim();
@@ -211,6 +235,53 @@ public class DetailActivity extends AppCompatActivity {
         }
         if ("long".equals(task == null ? "short" : task.kind)) b.put("progress", progressBar.getProgress());
         return b;
+    }
+
+    private void renderChecklist() {
+        if (checklistBox == null) return;
+        checklistBox.removeAllViews();
+        if (checklist.length() == 0) {
+            checklistBox.addView(Ui.label(this, "还没有小步骤，可以在网页里加"));
+            return;
+        }
+        for (int i = 0; i < checklist.length(); i++) {
+            final int idx = i;
+            final JSONObject it = checklist.optJSONObject(i);
+            if (it == null) continue;
+            boolean done = it.optBoolean("d");
+            TextView row = Ui.text(this, (done ? "☑  " : "☐  ") + it.optString("t"), 14,
+                    Ui.attr(this, done ? com.google.android.material.R.attr.colorOnSurfaceVariant
+                            : com.google.android.material.R.attr.colorOnSurface));
+            if (done) row.setPaintFlags(row.getPaintFlags() | android.graphics.Paint.STRIKE_THRU_TEXT_FLAG);
+            row.setPadding(0, Ui.dp(this, 10), 0, Ui.dp(this, 10));
+            row.setOnClickListener(v -> {
+                try {
+                    checklist.getJSONObject(idx).put("d", !checklist.getJSONObject(idx).optBoolean("d"));
+                } catch (Exception ignored) {
+                }
+                renderChecklist();
+                saveChecklist();
+            });
+            checklistBox.addView(row);
+        }
+    }
+
+    private void saveChecklist() {
+        try {
+            JSONObject body = new JSONObject();
+            body.put("checklist", checklist);
+            Api.patch(this, "/api/collections/tasks/records/" + id, body, new Api.Cb() {
+                @Override
+                public void ok(String b) {
+                }
+
+                @Override
+                public void fail(Exception e) {
+                    Ui.toast(DetailActivity.this, "清单没存上：" + e.getMessage());
+                }
+            });
+        } catch (Exception ignored) {
+        }
     }
 
     private void save(Runnable retry) {

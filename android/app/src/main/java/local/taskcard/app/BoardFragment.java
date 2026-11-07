@@ -37,6 +37,7 @@ public class BoardFragment extends Fragment {
     private RecyclerView list;
     private TextView empty;
     private String filter = "all";
+    private String query = "";
     private final List<Task> all = new ArrayList<>();
 
     @Nullable
@@ -46,6 +47,29 @@ public class BoardFragment extends Fragment {
         LinearLayout root = Ui.column(requireContext());
         root.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        EditText search = Ui.input(requireContext(), "搜索标题 / 标签", "",
+                android.text.InputType.TYPE_CLASS_TEXT);
+        LinearLayout.LayoutParams searchLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        int sp = Ui.dp(requireContext(), 12);
+        searchLp.setMargins(sp, Ui.dp(requireContext(), 10), sp, 0);
+        root.addView(search, searchLp);
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int st, int c, int a) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int st, int b, int c) {
+                query = s.toString().trim();
+                render();
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+            }
+        });
 
         ChipGroup chips = new ChipGroup(requireContext());
         chips.setSingleSelection(true);
@@ -59,6 +83,18 @@ public class BoardFragment extends Fragment {
             chip.setCheckable(true);
             chip.setTag(d[1]);
             chip.setChecked("all".equals(d[1]));
+            int onSurface = Ui.attr(requireContext(), com.google.android.material.R.attr.colorOnSurface);
+            int onSurfaceVariant = Ui.attr(requireContext(), com.google.android.material.R.attr.colorOnSurfaceVariant);
+            int surfaceColor = Ui.attr(requireContext(), com.google.android.material.R.attr.colorSurface);
+            chip.setChipBackgroundColor(new android.content.res.ColorStateList(
+                    new int[][]{{android.R.attr.state_checked}, {}},
+                    new int[]{onSurface, 0x00FFFFFF}));
+            chip.setTextColor(new android.content.res.ColorStateList(
+                    new int[][]{{android.R.attr.state_checked}, {}},
+                    new int[]{surfaceColor, onSurfaceVariant}));
+            chip.setChipStrokeWidth(Ui.dp(requireContext(), 1));
+            chip.setChipStrokeColor(android.content.res.ColorStateList.valueOf(
+                    Ui.attr(requireContext(), com.google.android.material.R.attr.colorOutline)));
             chips.addView(chip);
         }
         chips.setOnCheckedStateChangeListener((group, checkedIds) -> {
@@ -163,6 +199,7 @@ public class BoardFragment extends Fragment {
     private void render() {
         List<Task> shown = new ArrayList<>();
         for (Task t : all) {
+            if (!t.matches(query)) continue;
             if ("all".equals(filter)) shown.add(t);
             else if ("done".equals(filter) && t.done()) shown.add(t);
             else if ("todo".equals(filter) && !t.done() && !"doing".equals(t.status)) shown.add(t);

@@ -1,5 +1,6 @@
 package local.taskcard.app;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class Task {
@@ -14,9 +15,13 @@ public class Task {
     public String description = "";
     public String materials = "";
     public String notes = "";
+    public String tags = "";
     public int estimateMin = 0;
     public int progress = 0;
     public int weeklyHours = 0;
+    public JSONArray checklist = new JSONArray();
+    public int checkDone = 0;
+    public int checkTotal = 0;
     public boolean draft = false;
 
     public static Task from(JSONObject o) {
@@ -32,11 +37,29 @@ public class Task {
         t.description = o.optString("description");
         t.materials = o.optString("materials");
         t.notes = o.optString("notes");
+        t.tags = o.optString("tags");
         t.estimateMin = o.optInt("estimate_min");
         t.progress = o.optInt("progress");
         t.weeklyHours = o.optInt("weekly_hours");
         t.draft = o.optBoolean("draft");
+        JSONArray list = o.optJSONArray("checklist");
+        t.checklist = list != null ? list : new JSONArray();
+        if (list != null) {
+            t.checkTotal = list.length();
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject it = list.optJSONObject(i);
+                if (it != null && it.optBoolean("d")) t.checkDone += 1;
+            }
+        }
         return t;
+    }
+
+    public boolean matches(String q) {
+        if (q == null || q.isEmpty()) return true;
+        String needle = q.toLowerCase();
+        return title.toLowerCase().contains(needle)
+                || tags.toLowerCase().contains(needle)
+                || description.toLowerCase().contains(needle);
     }
 
     public String statusLabel() {

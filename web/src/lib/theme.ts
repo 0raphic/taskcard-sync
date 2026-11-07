@@ -29,8 +29,19 @@ export function resolvedTheme(mode: ThemeMode): 'light' | 'dark' {
   return mode;
 }
 
+let swapTimer: number | undefined;
+
 export function applyTheme(mode: ThemeMode) {
-  document.documentElement.dataset.theme = resolvedTheme(mode);
+  const root = document.documentElement;
+  const theme = resolvedTheme(mode);
+  // 换肤瞬间关掉所有过渡，避免背景/文字在两种颜色之间“闪”一下
+  root.classList.add('theme-swap');
+  root.dataset.theme = theme;
+  root.style.colorScheme = theme;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#0e0e0d' : '#ffffff');
+  window.clearTimeout(swapTimer);
+  swapTimer = window.setTimeout(() => root.classList.remove('theme-swap'), 240);
 }
 
 export function saveMode(mode: ThemeMode) {

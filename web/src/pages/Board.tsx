@@ -19,6 +19,13 @@ const COLUMNS: Column[] = [
   { key: 'done', title: '已完成', hint: '收过的卡', match: (t) => isDone(t) },
 ];
 
+const FOCUS: { key: 'all' | 'today' | 'overdue' | 'checklist'; label: string }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'today', label: '今天' },
+  { key: 'overdue', label: '逾期' },
+  { key: 'checklist', label: '有清单' },
+];
+
 export function Board() {
   const { tasks, error } = useTasks();
   const update = useUpdateTask();
@@ -27,6 +34,8 @@ export function Board() {
   const [dragging, setDragging] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
   const [held, setHeld] = useState<Task | null>(null);
+  const [focus, setFocus] = useState<'all' | 'today' | 'overdue' | 'checklist'>('all');
+  const [q, setQ] = useState('');
   const holdTimer = useRef<number | null>(null);
   const holdStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
@@ -112,6 +121,19 @@ export function Board() {
   const overdue = list.filter((t) => isOverdue(t));
   const today = list.filter((t) => isToday(t) && !isOverdue(t));
 
+  const keyword = q.trim().toLowerCase();
+  const shown = list.filter((t) => {
+    if (focus === 'today' && !isToday(t)) return false;
+    if (focus === 'overdue' && !isOverdue(t)) return false;
+    if (focus === 'checklist' && !(t.checklist && t.checklist.length > 0)) return false;
+    if (!keyword) return true;
+    return (
+      t.title.toLowerCase().includes(keyword) ||
+      (t.description || '').toLowerCase().includes(keyword) ||
+      (t.tags || '').toLowerCase().includes(keyword)
+    );
+  });
+
   const now = new Date();
   const dateLabel = `${now.getMonth() + 1} 月 ${now.getDate()} 日 · 周${WEEK[now.getDay()]}`;
 
@@ -155,12 +177,40 @@ export function Board() {
         </p>
       )}
 
+      {tasks && (
+        <div className="flex flex-wrap items-center gap-2 border-y border-line py-2">
+          {FOCUS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFocus(f.key)}
+              className={`border px-2.5 py-1 text-[11px] tracking-[0.06em] ${
+                focus === f.key
+                  ? 'border-ink bg-ink text-canvas'
+                  : 'border-line text-ink-soft hover:border-ink hover:text-ink'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="搜标题 / 标签"
+            className="ml-auto w-[170px] border border-line bg-transparent px-2 py-1 text-[12px] outline-none placeholder:text-ink-soft/60 focus:border-ink"
+          />
+          <span className="font-mono text-[11px] text-ink-soft">
+            {shown.length}/{list.length}
+          </span>
+        </div>
+      )}
+
       {!tasks && !error && <Skeleton />}
 
       {tasks && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {COLUMNS.map((col) => {
-            const items = list.filter(col.match);
+            const items = shown.filter(col.match);
             const isOver = overCol === col.key;
             return (
               <section

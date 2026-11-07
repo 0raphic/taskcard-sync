@@ -40,7 +40,7 @@ public final class Ui {
 
     public static MaterialCardView card(Context c) {
         MaterialCardView card = new MaterialCardView(c);
-        card.setRadius(dp(c, 16));
+        card.setRadius(0);
         card.setCardElevation(0);
         card.setStrokeWidth(dp(c, 1));
         card.setStrokeColor(attr(c, com.google.android.material.R.attr.colorOutlineVariant));
@@ -84,8 +84,8 @@ public final class Ui {
         e.setInputType(type);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(attr(c, com.google.android.material.R.attr.colorSurfaceVariant));
-        bg.setCornerRadius(dp(c, 10));
-        bg.setStroke(dp(c, 1), 0x33000000);
+        bg.setCornerRadius(0);
+        bg.setStroke(dp(c, 1), attr(c, com.google.android.material.R.attr.colorOutline));
         e.setBackground(bg);
         e.setPadding(dp(c, 12), dp(c, 10), dp(c, 12), dp(c, 10));
         return e;

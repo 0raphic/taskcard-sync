@@ -1,38 +1,38 @@
 @import "tailwindcss";
 
-/* 主题变量：深色（默认，切割垫 + 纸卡）与浅色（灯下写字的桌面） */
+/* 瑞士风：白纸黑字，红色只做强调；浅色为默认，深色是同一套网格的反相 */
 :root {
-  --canvas: #232522;
-  --canvas-soft: #2c2f2b;
-  --surface: #fbfaf6;
-  --surface-dim: #f2f0e8;
-  --ink: #17181a;
-  --ink-soft: #5b5f58;
-  --oncanvas: #fbfaf6;
-  --oncanvas-soft: #a8aaa3;
-  --line: rgba(251, 250, 246, 0.16);
-  --rule: #d9d6cd;
-  --seal: #b23a2f;
-  --moss: #3f6b4a;
-  --amber: #a86a15;
-  color-scheme: dark;
+  --canvas: #ffffff;
+  --canvas-soft: #f5f5f3;
+  --surface: #ffffff;
+  --surface-dim: #f4f4f1;
+  --ink: #0a0a0a;
+  --ink-soft: #6b6b66;
+  --oncanvas: #0a0a0a;
+  --oncanvas-soft: #6b6b66;
+  --line: rgba(10, 10, 10, 0.16);
+  --rule: #111111;
+  --seal: #d6362b;
+  --moss: #2f6b46;
+  --amber: #b06a00;
+  color-scheme: light;
 }
 
-:root[data-theme="light"] {
-  --canvas: #f4f2ea;
-  --canvas-soft: #fffdf7;
-  --surface: #fffdf8;
-  --surface-dim: #f0ede4;
-  --ink: #1b1c1a;
-  --ink-soft: #5f625b;
-  --oncanvas: #1b1c1a;
-  --oncanvas-soft: #6b6e66;
-  --line: rgba(23, 24, 26, 0.16);
-  --rule: #d8d4c9;
-  --seal: #a5352b;
-  --moss: #3a6344;
-  --amber: #96600f;
-  color-scheme: light;
+:root[data-theme="dark"] {
+  --canvas: #0e0e0d;
+  --canvas-soft: #171716;
+  --surface: #141413;
+  --surface-dim: #1c1c1a;
+  --ink: #f4f3ef;
+  --ink-soft: #9b9a94;
+  --oncanvas: #f4f3ef;
+  --oncanvas-soft: #9b9a94;
+  --line: rgba(244, 243, 239, 0.2);
+  --rule: #f4f3ef;
+  --seal: #ef5347;
+  --moss: #6fae86;
+  --amber: #e0a33a;
+  color-scheme: dark;
 }
 
 @theme {
@@ -50,21 +50,29 @@
   --color-moss: var(--moss);
   --color-amber: var(--amber);
 
-  --font-sans: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC",
-    system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  --font-sans: "Helvetica Neue", "Inter", "PingFang SC", "Noto Sans SC", "Microsoft YaHei",
+    system-ui, sans-serif;
+  --font-mono: "SF Mono", "Cascadia Mono", ui-monospace, Consolas, monospace;
 }
 
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    background: var(--canvas);
+  }
+  /* 换肤的那一下不跑过渡，避免屏闪 */
+  html.theme-swap *,
+  html.theme-swap *::before,
+  html.theme-swap *::after {
+    transition: none !important;
+    animation: none !important;
   }
   body {
     @apply bg-canvas text-oncanvas font-sans antialiased;
     font-feature-settings: "tnum" 1;
   }
   ::selection {
-    @apply bg-seal text-surface;
+    @apply bg-seal text-white;
   }
   :focus-visible {
     outline: 2px solid var(--seal);
@@ -81,57 +89,48 @@
 }
 
 @layer components {
-  /* 卡片：裁剪线是虚线的，和打印出来的纸卡一致 */
+  /* 纸卡的边：瑞士风用实线，和红章一起构成「表格」 */
   .trim {
-    border: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
   }
-  /* 完成章：盖在纸卡上，抬手那一下的放大回弹 */
+  .micro {
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
   .stamp {
-    border: 2px solid color-mix(in srgb, var(--seal) 55%, transparent);
-    border-radius: 3px;
+    border: 2px solid color-mix(in srgb, var(--seal) 60%, transparent);
     padding: 0.05rem 0.45rem;
-    color: color-mix(in srgb, var(--seal) 78%, transparent);
-    font-size: 17px;
+    color: color-mix(in srgb, var(--seal) 82%, transparent);
+    font-size: 16px;
     font-weight: 700;
     letter-spacing: 0.22em;
     text-indent: 0.22em;
     line-height: 1.2;
     white-space: nowrap;
-    transform: rotate(-8deg);
-    mix-blend-mode: multiply;
-    animation: stamp-in 260ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+    transform: rotate(-6deg);
+    animation: stamp-in 220ms ease both;
   }
-
-  /* 纸卡浮起：靠影子分层，浅色下也成立 */
   .paper-lift {
-    box-shadow:
-      0 1px 0 color-mix(in srgb, var(--ink) 16%, transparent),
-      0 20px 32px -24px rgba(0, 0, 0, 0.55);
-    transition: box-shadow 200ms ease;
+    box-shadow: none;
   }
-  .paper-lift:hover {
-    box-shadow:
-      0 1px 0 color-mix(in srgb, var(--ink) 18%, transparent),
-      0 26px 42px -24px rgba(0, 0, 0, 0.6);
-  }
-  /* 手写线 */
   .ruled {
     background-image: repeating-linear-gradient(
       to bottom,
       transparent 0,
-      transparent 1.55rem,
-      color-mix(in srgb, var(--ink) 14%, transparent) 1.55rem,
-      color-mix(in srgb, var(--ink) 14%, transparent) calc(1.55rem + 1px)
+      transparent 1.6rem,
+      color-mix(in srgb, var(--ink) 12%, transparent) 1.6rem,
+      color-mix(in srgb, var(--ink) 12%, transparent) calc(1.6rem + 1px)
     );
   }
 }
 
-/* 只动透明度：带 mix-blend + 缩放动画在无头浏览器里会留下重影 */
 @keyframes stamp-in {
   from {
     opacity: 0;
   }
   to {
-    opacity: 0.9;
+    opacity: 0.92;
   }
 }

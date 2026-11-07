@@ -7,6 +7,7 @@ import { Link, navigate } from '../lib/router';
 import {
   STATUSES,
   STATUS_LABEL,
+  type ChecklistItem,
   type ProgressLog,
   type Status,
 } from '../lib/types';
@@ -22,6 +23,15 @@ export function Detail({ id }: { id: string }) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [plan, setPlan] = useState({ priority: '', dod: '', start: '', weekly_hours: '' });
+  const [tagText, setTagText] = useState('');
+  const [items, setItems] = useState<ChecklistItem[]>([]);
+  const [newItem, setNewItem] = useState('');
+
+  useEffect(() => {
+    if (!task) return;
+    setTagText(task.tags ?? '');
+    setItems(Array.isArray(task.checklist) ? task.checklist : []);
+  }, [task]);
 
   useEffect(() => {
     if (!task) return;
@@ -41,6 +51,26 @@ export function Detail({ id }: { id: string }) {
     } catch (e) {
       setFlash(message(e));
     }
+  }
+
+  async function saveItems(next: ChecklistItem[]) {
+    setItems(next);
+    await savePlan({ checklist: next });
+  }
+
+  function toggleItem(index: number) {
+    void saveItems(items.map((it, i) => (i === index ? { ...it, d: !it.d } : it)));
+  }
+
+  function addItem() {
+    const text = newItem.trim();
+    if (!text) return;
+    setNewItem('');
+    void saveItems([...items, { t: text, d: false }]);
+  }
+
+  function removeItem(index: number) {
+    void saveItems(items.filter((_, i) => i !== index));
   }
 
   useEffect(() => {
@@ -205,6 +235,73 @@ export function Detail({ id }: { id: string }) {
                   </label>
                 )}
               </div>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">标签</h2>
+            <input
+              value={tagText}
+              onChange={(e) => setTagText(e.target.value)}
+              onBlur={() => void savePlan({ tags: tagText.trim() })}
+              placeholder="逗号分隔，例如：论文, 实验, 这周"
+              className="w-full border border-line/20 bg-transparent px-3 py-2 text-[12.5px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/50"
+            />
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="flex items-baseline gap-2 text-[11px] tracking-[0.18em] text-oncanvas/45">
+              清单
+              <span className="font-mono text-[10px] tracking-normal text-oncanvas/30">
+                {items.filter((i) => i.d).length}/{items.length}
+              </span>
+            </h2>
+            <ul className="flex flex-col divide-y divide-line/40 border-y border-line/15">
+              {items.map((it, i) => (
+                <li key={`${it.t}-${i}`} className="flex items-center gap-3 py-2">
+                  <button
+                    type="button"
+                    aria-label={it.d ? '标记为未完成' : '标记为完成'}
+                    onClick={() => toggleItem(i)}
+                    className={`grid h-4 w-4 shrink-0 place-items-center border ${
+                      it.d ? 'border-ink bg-ink text-canvas' : 'border-ink/35'
+                    }`}
+                  >
+                    {it.d && <span className="text-[10px] leading-none">✓</span>}
+                  </button>
+                  <span
+                    className={`flex-1 text-[12.5px] ${
+                      it.d ? 'text-oncanvas/35 line-through' : 'text-oncanvas/80'
+                    }`}
+                  >
+                    {it.t}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(i)}
+                    className="text-[11px] text-oncanvas/30 hover:text-seal"
+                  >
+                    删除
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              <input
+                value={newItem}
+                onChange={(e) => setNewItem(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addItem()}
+                placeholder="加一条小步骤，回车保存"
+                className="flex-1 border border-line/20 bg-transparent px-3 py-2 text-[12.5px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/50"
+              />
+              <button
+                type="button"
+                disabled={!newItem.trim()}
+                onClick={addItem}
+                className="border border-line/25 px-3 text-[12px] text-oncanvas/80 hover:border-ink disabled:opacity-40"
+              >
+                加上
+              </button>
+            </div>
           </section>
 
           {task.kind === 'long' && (

@@ -17,11 +17,6 @@ export function Settings() {
   const [backups, setBackups] = useState<{ key: string; size: number; modified: string }[]>([]);
   const [dataFlash, setDataFlash] = useState<string | null>(null);
   const [dataBusy, setDataBusy] = useState(false);
-  const [passOn, setPassOn] = useState(false);
-  const [passNew, setPassNew] = useState('');
-  const [passOld, setPassOld] = useState('');
-  const [passFlash, setPassFlash] = useState<string | null>(null);
-  const [passBusy, setPassBusy] = useState(false);
 
   async function loadBackups() {
     try {
@@ -60,7 +55,6 @@ export function Settings() {
   useEffect(() => {
     void load();
     void loadBackups();
-    void loadPass();
   }, []);
 
   async function save() {
@@ -83,37 +77,6 @@ export function Settings() {
       setFlash(`保存失败：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function loadPass() {
-    try {
-      const j = (await (await fetch('/ds-api/passcode')).json()) as { enabled?: boolean };
-      setPassOn(Boolean(j.enabled));
-    } catch {
-      setPassOn(false);
-    }
-  }
-
-  async function savePass(next: string) {
-    setPassBusy(true);
-    setPassFlash(null);
-    try {
-      const r = await fetch('/ds-api/passcode', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ passcode: next, current: passOld }),
-      });
-      const j = (await r.json()) as { ok?: boolean; enabled?: boolean; error?: string };
-      if (!r.ok || !j.ok) throw new Error(j.error || `保存失败 HTTP ${r.status}`);
-      setPassOn(Boolean(j.enabled));
-      setPassNew('');
-      setPassOld('');
-      setPassFlash(j.enabled ? '口令已开启，这台设备下次写操作要输一次' : '口令已关闭');
-    } catch (e) {
-      setPassFlash(e instanceof Error ? e.message : String(e));
-    } finally {
-      setPassBusy(false);
     }
   }
 
@@ -235,49 +198,15 @@ export function Settings() {
         )}
       </div>
 
-      <div className="paper-lift mt-5 rounded-[3px] bg-surface p-6 text-ink">
-        <p className="text-[11px] tracking-[0.18em] text-ink/45">ACCESS</p>
-        <p className="mt-1 text-[15px] font-semibold">写操作口令</p>
+            <div className="mt-5 border border-ink/15 bg-surface p-6 text-ink">
+        <p className="text-[11px] tracking-[0.18em] text-ink/45">ACCOUNT</p>
+        <p className="mt-1 text-[15px] font-semibold">账号系统（还没接）</p>
         <p className="mt-2 text-[12px] leading-relaxed text-ink/55">
-          开了之后，同一 Wi-Fi 下的设备改数据要先输一次 4–12 位数字口令。
-          扫码看卡、拍照识别不受影响；只挡「改」。
+          写操作口令已经停用：现在局域网里的设备都能直接改数据。下一步换成账号登录，
+          每张卡记录是谁改的；在那之前，别把这个地址暴露到公网。
         </p>
-        <p className="mt-3 text-[12px]">
-          当前：
-          <span className={passOn ? 'font-semibold text-seal' : 'text-ink/50'}>
-            {passOn ? '已开启' : '未开启（谁连上都能改）'}
-          </span>
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {passOn && (
-            <input
-              type="password"
-              inputMode="numeric"
-              value={passOld}
-              onChange={(e) => setPassOld(e.target.value.replace(/\D/g, '').slice(0, 12))}
-              placeholder="原口令"
-              className="w-[120px] border border-ink/25 bg-transparent px-3 py-2 text-[13px] outline-none focus:border-seal/60"
-            />
-          )}
-          <input
-            type="password"
-            inputMode="numeric"
-            value={passNew}
-            onChange={(e) => setPassNew(e.target.value.replace(/\D/g, '').slice(0, 12))}
-            placeholder={passOn ? '新口令（留空=关闭）' : '设置 4–12 位数字'}
-            className="w-[190px] border border-ink/25 bg-transparent px-3 py-2 text-[13px] outline-none focus:border-seal/60"
-          />
-          <button
-            type="button"
-            disabled={passBusy}
-            onClick={() => void savePass(passNew.trim())}
-            className="bg-ink px-4 py-2 text-[12px] text-oncanvas disabled:opacity-60"
-          >
-            {passBusy ? '保存中…' : passOn && !passNew.trim() ? '关闭口令' : '保存'}
-          </button>
-          {passFlash && <span className="text-[11px] text-ink/55">{passFlash}</span>}
-        </div>
       </div>
+
     </div>
   );
 }

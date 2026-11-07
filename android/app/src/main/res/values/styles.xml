@@ -1,21 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <style name="ShapeSquare" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">0dp</item>
+    </style>
+
     <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">#B23A2F</item>
+        <item name="colorPrimary">#D6362B</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorPrimaryContainer">#F4D7D2</item>
-        <item name="colorOnPrimaryContainer">#3B0A05</item>
-        <item name="colorSecondary">#3F6B4A</item>
+        <item name="colorPrimaryContainer">#F6D9D6</item>
+        <item name="colorOnPrimaryContainer">#3D0804</item>
+        <item name="colorSecondary">#0A0A0A</item>
         <item name="colorOnSecondary">#FFFFFF</item>
-        <item name="colorSecondaryContainer">#F4D7D2</item>
-        <item name="colorOnSecondaryContainer">#3B0A05</item>
-        <item name="colorPrimaryContainer">#F4D7D2</item>
-        <item name="colorOnPrimaryContainer">#3B0A05</item>
-        <item name="colorSurface">#FBFAF6</item>
-        <item name="colorOnSurface">#17181A</item>
-        <item name="colorSurfaceVariant">#EDEAE2</item>
-        <item name="colorOnSurfaceVariant">#5B5A55</item>
-        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="colorSecondaryContainer">#0A0A0A</item>
+        <item name="colorOnSecondaryContainer">#FFFFFF</item>
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorOnSurface">#0A0A0A</item>
+        <item name="colorSurfaceVariant">#F2F2EF</item>
+        <item name="elevationOverlayEnabled">false</item>
+        <item name="colorOnSurfaceVariant">#6B6B66</item>
+        <item name="colorOutline">#BDBDB8</item>
+        <item name="colorOutlineVariant">#DEDEDA</item>
+        <item name="colorSurfaceContainer">#FFFFFF</item>
+        <item name="colorSurfaceContainerHigh">#FFFFFF</item>
+        <item name="colorSurfaceContainerHighest">#FFFFFF</item>
+        <item name="colorSurfaceContainerLow">#FFFFFF</item>
+        <item name="android:windowBackground">@color/canvas</item>
+        <item name="android:statusBarColor">@color/canvas</item>
+        <item name="android:navigationBarColor">@color/canvas</item>
         <item name="android:windowLightStatusBar">true</item>
+
+        <item name="shapeAppearanceCornerExtraSmall">@style/ShapeSquare</item>
+        <item name="shapeAppearanceCornerSmall">@style/ShapeSquare</item>
+        <item name="shapeAppearanceCornerMedium">@style/ShapeSquare</item>
+        <item name="shapeAppearanceCornerLarge">@style/ShapeSquare</item>
+        <item name="shapeAppearanceCornerExtraLarge">@style/ShapeSquare</item>
     </style>
 </resources>

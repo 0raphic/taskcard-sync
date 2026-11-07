@@ -54,15 +54,18 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.VH> {
         title.setPadding(0, Ui.dp(c, 6), 0, Ui.dp(c, 4));
         TextView desc = Ui.text(c, "", 13, Ui.attr(c, com.google.android.material.R.attr.colorOnSurfaceVariant));
         desc.setMaxLines(2);
+        TextView tags = Ui.label(c, "");
+        tags.setPadding(0, Ui.dp(c, 8), 0, 0);
         TextView meta = Ui.label(c, "");
         meta.setPadding(0, Ui.dp(c, 10), 0, 0);
 
         box.addView(head);
         box.addView(title);
         box.addView(desc);
+        box.addView(tags);
         box.addView(meta);
         card.addView(box);
-        return new VH(card, head, title, desc, meta);
+        return new VH(card, head, title, desc, tags, meta);
     }
 
     @Override
@@ -77,6 +80,19 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.VH> {
         if ("long".equals(t.kind)) m = "进度 " + t.progress + "%" + (t.weeklyHours > 0 ? " · 每周 " + t.weeklyHours + "h" : "");
         h.meta.setText(m);
         h.meta.setVisibility(m.isEmpty() ? View.GONE : View.VISIBLE);
+        String[] tagList = t.tags.split("[,，\\s]+");
+        StringBuilder tagLine = new StringBuilder();
+        for (String tag : tagList) {
+            if (tag.isEmpty()) continue;
+            if (tagLine.length() > 0) tagLine.append("  ");
+            tagLine.append('#').append(tag);
+        }
+        if (t.checkTotal > 0) {
+            if (tagLine.length() > 0) tagLine.append("   ");
+            tagLine.append("清单 ").append(t.checkDone).append('/').append(t.checkTotal);
+        }
+        h.tags.setText(tagLine.toString());
+        h.tags.setVisibility(tagLine.length() == 0 ? View.GONE : View.VISIBLE);
         h.card.setOnClickListener(v -> listener.onOpen(t));
         h.card.setOnLongClickListener(v -> {
             listener.onLong(t);
@@ -91,14 +107,15 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.VH> {
 
     static class VH extends RecyclerView.ViewHolder {
         final MaterialCardView card;
-        final TextView head, title, desc, meta;
+        final TextView head, title, desc, tags, meta;
 
-        VH(MaterialCardView card, TextView head, TextView title, TextView desc, TextView meta) {
+        VH(MaterialCardView card, TextView head, TextView title, TextView desc, TextView tags, TextView meta) {
             super(card);
             this.card = card;
             this.head = head;
             this.title = title;
             this.desc = desc;
+            this.tags = tags;
             this.meta = meta;
         }
     }

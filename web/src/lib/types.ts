@@ -10,6 +10,8 @@ export const STATUS_LABEL: Record<Status, string> = {
 
 export type Kind = 'short' | 'long';
 
+export type ChecklistItem = { t: string; d: boolean };
+
 export type Task = {
   id: string;
   title: string;
@@ -28,6 +30,8 @@ export type Task = {
   priority?: string;
   dod?: string;
   weekly_hours?: number;
+  tags?: string;
+  checklist?: ChecklistItem[];
   draft?: boolean;
   client_updated_at?: string;
   created?: string;
@@ -53,6 +57,20 @@ export type ProgressLog = {
 };
 
 export const isDone = (t: Task) => t.status === 'done';
+
+/** 标签是逗号/空格分隔的一行文本，读的时候拆开 */
+export function parseTags(t: Task): string[] {
+  return (t.tags || '')
+    .split(/[,，\s]+/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+export function checkStats(t: Task): { done: number; total: number } {
+  const list = t.checklist || [];
+  return { done: list.filter((x) => x.d).length, total: list.length };
+}
 
 /** 逾期判断：只认 MM-DD 这种手写日期，不做时区推算 */
 export function isOverdue(t: Task, today = new Date()): boolean {

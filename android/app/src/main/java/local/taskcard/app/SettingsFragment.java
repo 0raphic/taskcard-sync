@@ -23,7 +23,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 public class SettingsFragment extends Fragment {
 
     private EditText base;
-    private EditText token;
     private TextView status;
 
     @Nullable
@@ -48,11 +47,6 @@ public class SettingsFragment extends Fragment {
                 android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         root.addView(base);
 
-        root.addView(Ui.label(c, "写操作口令（留空 = 不带）"));
-        token = Ui.input(c, "4–12 位数字", Api.token(c),
-                android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-        root.addView(token);
-
         MaterialButton save = new MaterialButton(c);
         save.setText("保存");
         LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(
@@ -61,7 +55,6 @@ public class SettingsFragment extends Fragment {
         root.addView(save, slp);
         save.setOnClickListener(v -> {
             Api.setBase(requireContext(), base.getText().toString().trim());
-            Api.setToken(requireContext(), token.getText().toString().trim());
             Ui.toast(requireContext(), "保存了");
         });
 
@@ -77,7 +70,6 @@ public class SettingsFragment extends Fragment {
         root.addView(status);
         test.setOnClickListener(v -> {
             Api.setBase(requireContext(), base.getText().toString().trim());
-            Api.setToken(requireContext(), token.getText().toString().trim());
             status.setText("连接中…");
             Api.get(requireContext(), "/ds-api/health", new Api.Cb() {
                 @Override
@@ -111,6 +103,13 @@ public class SettingsFragment extends Fragment {
                     : AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         });
         root.addView(theme);
+
+        root.addView(Ui.label(c, "账号系统（还没接）"), new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        TextView acc = Ui.label(c, "写操作口令已停用：现在同一 Wi-Fi 下的设备都能直接改数据。"
+                + "下一步换成账号登录，每张卡记录是谁改的；在那之前别把地址开到公网。");
+        acc.setPadding(0, Ui.dp(c, 6), 0, 0);
+        root.addView(acc);
 
         MaterialButton web = new MaterialButton(c, null,
                 com.google.android.material.R.attr.materialButtonOutlinedStyle);

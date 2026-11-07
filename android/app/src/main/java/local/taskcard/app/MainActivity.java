@@ -48,6 +48,12 @@ public class MainActivity extends AppCompatActivity {
 
         nav = new BottomNavigationView(this);
         nav.inflateMenu(R.menu.bottom_nav);
+        nav.setItemActiveIndicatorEnabled(false);
+        android.content.res.ColorStateList navColors = new android.content.res.ColorStateList(
+                new int[][]{{android.R.attr.state_checked}, {}},
+                new int[]{Ui.attr(this, com.google.android.material.R.attr.colorOnSurface), Ui.attr(this, com.google.android.material.R.attr.colorOnSurfaceVariant)});
+        nav.setItemIconTintList(navColors);
+        nav.setItemTextColor(navColors);
         root.addView(nav, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
