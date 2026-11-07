@@ -1,6 +1,6 @@
 # 任务卡片 · Task Card
 
-> 开发文档：[docs/开发文档.md](docs/开发文档.md)
+> 开发文档：[docs/开发文档.md](docs/开发文档.md) · 错误文案表：[docs/错误文案表.md](docs/错误文案表.md) · 测试记录：[docs/第一次测试.md](docs/第一次测试.md)
 
 一叠能打印的纸卡 + 一个网页。纸卡上印二维码，手机扫码改状态，电脑上的看板一秒内跟着变。
 
@@ -145,6 +145,8 @@ cards/              tasks.json（卡片内容）、cards.pdf、cards-double.pdf�
 android/            手机 App（WebView 外壳，里面就是同一个网页）
 dist/taskcard.apk   已经打包好的手机安装包
 docs/demo-script.md 三分钟讲稿 + 现场保险清单
+docs/错误文案表.md 错误/空态/成功提示的统一说法
+docs/第一次测试.md 接口 21 项 + 界面 15 项测试记录
 tools/              下载 / 启动 PocketBase、CDP 截图、Android SDK 与 APK 打包脚本
 ```
 
