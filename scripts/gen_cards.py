@@ -258,7 +258,8 @@ def main() -> None:
 
     if args.input == "-":
         # 服务端打印流程：JSON 从 stdin 进来，不用落输入文件
-        data = json.loads(sys.stdin.read())
+        # 必须按 UTF-8 从 buffer 读：Windows 上 sys.stdin 默认走 cp936，中文会变成乱码
+        data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
     else:
         data = json.loads(Path(args.input).read_text(encoding="utf-8"))
     tasks = data["tasks"]
