@@ -126,6 +126,32 @@ export function Detail({ id }: { id: string }) {
             {flash && <p className="text-[11px] text-oncanvas/45">{flash}</p>}
           </section>
 
+          {(task.priority || task.dod || task.start || task.weekly_hours) && (
+            <section className="space-y-1.5">
+              <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">卡面上的规划</h2>
+              {task.priority && (
+                <p className="text-[12px] text-oncanvas/70">
+                  优先级 <span className="text-oncanvas">{task.priority}</span>
+                </p>
+              )}
+              {task.dod && (
+                <p className="text-[12px] text-oncanvas/70">
+                  完成标准 <span className="text-oncanvas">{task.dod}</span>
+                </p>
+              )}
+              {task.start && (
+                <p className="text-[12px] text-oncanvas/70">
+                  开始 <span className="text-oncanvas">{task.start}</span>
+                </p>
+              )}
+              {task.weekly_hours ? (
+                <p className="text-[12px] text-oncanvas/70">
+                  每周投入 <span className="text-oncanvas">{task.weekly_hours} 小时</span>
+                </p>
+              ) : null}
+            </section>
+          )}
+
           {task.kind === 'long' && (
             <section className="flex flex-col gap-2">
               <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">进度</h2>

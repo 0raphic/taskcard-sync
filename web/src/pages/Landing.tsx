@@ -54,12 +54,16 @@ export function Landing({ code }: { code: string }) {
   const [saving, setSaving] = useState(false);
   const [fields, setFields] = useState<{
     title?: string;
+    priority?: string;
+    dod?: string;
+    start?: string;
     due?: string;
     estimate_min?: number | null;
     description?: string;
     materials?: string;
     notes?: string;
     progress?: number | null;
+    weekly_hours?: number | null;
   } | null>(null);
 
   async function fromPhoto(file: File) {
@@ -108,12 +112,19 @@ export function Landing({ code }: { code: string }) {
       const desc = (fields.description ?? '').trim();
       const materials = (fields.materials ?? '').trim();
       const notes = (fields.notes ?? '').trim();
+      const dod = (fields.dod ?? '').trim();
+      const priority = (fields.priority ?? '').trim();
+      const start = (fields.start ?? '').trim();
       if (title) payload.title = title;
       if (due) payload.due = due;
       if (fields.estimate_min) payload.estimate_min = fields.estimate_min;
       if (desc) payload.description = desc;
       if (materials) payload.materials = materials;
       if (notes) payload.notes = notes;
+      if (dod) payload.dod = dod;
+      if (priority) payload.priority = priority;
+      if (start) payload.start = start;
+      if (task.kind === 'long' && fields.weekly_hours) payload.weekly_hours = fields.weekly_hours;
       if (task.kind === 'long' && fields.progress != null) {
         payload.progress = Math.max(0, Math.min(100, fields.progress));
       }
@@ -305,6 +316,40 @@ export function Landing({ code }: { code: string }) {
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">
+                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">优先级</span>
+                  <select
+                    value={fields.priority ?? ''}
+                    onChange={(e) => setFields({ ...fields, priority: e.target.value })}
+                    className="border border-ink/15 bg-surface px-2 py-1.5 text-[13px] focus:border-ink/35"
+                  >
+                    <option value="">（没写）</option>
+                    <option value="重要且紧急">重要且紧急</option>
+                    <option value="重要不紧急">重要不紧急</option>
+                    <option value="紧急不重要">紧急不重要</option>
+                    <option value="其他">其他</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">完成标准</span>
+                  <input
+                    value={fields.dod ?? ''}
+                    onChange={(e) => setFields({ ...fields, dod: e.target.value })}
+                    placeholder="做到什么程度算完"
+                    className="border border-ink/15 px-2 py-1.5 text-[12px] focus:border-ink/35"
+                  />
+                </label>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">开始</span>
+                  <input
+                    value={fields.start ?? ''}
+                    onChange={(e) => setFields({ ...fields, start: e.target.value })}
+                    placeholder="MM-DD"
+                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
                   <span className="text-[10px] tracking-[0.14em] text-ink-soft">截止</span>
                   <input
                     value={fields.due ?? ''}
@@ -351,6 +396,7 @@ export function Landing({ code }: { code: string }) {
                 </label>
               </div>
               {task.kind === 'long' && (
+                <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1">
                   <span className="text-[10px] tracking-[0.14em] text-ink-soft">进度 %</span>
                   <input
@@ -360,6 +406,16 @@ export function Landing({ code }: { code: string }) {
                     className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
                   />
                 </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">周投入（小时）</span>
+                  <input
+                    value={fields.weekly_hours ?? ''}
+                    onChange={(e) => setFields({ ...fields, weekly_hours: e.target.value === '' ? null : Number(e.target.value) })}
+                    inputMode="numeric"
+                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                  />
+                </label>
+                </div>
               )}
             </div>
             <button

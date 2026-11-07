@@ -25,6 +25,9 @@ export type Task = {
   start?: string;
   milestones?: string[];
   progress?: number;
+  priority?: string;
+  dod?: string;
+  weekly_hours?: number;
   draft?: boolean;
   client_updated_at?: string;
   created?: string;

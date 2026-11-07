@@ -217,7 +217,7 @@ async function callDeepSeek(messages, { key, model, maxTokens = 800 } = {}) {
 
 const SCAN_SYSTEM = `你在看一张手写任务卡的照片。先不要猜卡片编号（编号由二维码决定），只读卡面上写的字。
 只输出一个 JSON 对象，不要 Markdown 代码块，不要解释。字段：
-{"title": 任务名称原文, "due": "MM-DD 或空", "estimate_min": 数字分钟或 0, "description": 描述原文, "materials": 材料原文, "notes": 备注原文, "start": "MM-DD 或空", "goal": 目标原文, "progress": 0-100 的数字或 0}
+{"title": 任务名称原文, "priority": "重要且紧急|重要不紧急|紧急不重要|其他 或空", "dod": 完成标准原文, "start": "MM-DD 或空", "due": "MM-DD 或空", "estimate_min": 数字分钟或 0, "description": 描述原文, "materials": 材料原文, "notes": 备注原文, "goal": 目标原文, "weekly_hours": 数字小时或 0, "progress": 0-100 的数字或 0}
 读不出来、照片上没写的字段，留空字符串或 0，不要编造。`;
 
 app.post('/ds-api/structure', async (req, res) => {
