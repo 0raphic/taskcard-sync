@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
-        <item name="android:colorPrimary">#232522</item>
-        <item name="android:colorPrimaryDark">#17181a</item>
-        <item name="android:colorAccent">#b23a2f</item>
-        <item name="android:windowBackground">#232522</item>
-        <item name="android:statusBarColor">#232522</item>
-        <item name="android:navigationBarColor">#232522</item>
+    <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#B23A2F</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#F4D7D2</item>
+        <item name="colorOnPrimaryContainer">#3B0A05</item>
+        <item name="colorSecondary">#3F6B4A</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#F4D7D2</item>
+        <item name="colorOnSecondaryContainer">#3B0A05</item>
+        <item name="colorPrimaryContainer">#F4D7D2</item>
+        <item name="colorOnPrimaryContainer">#3B0A05</item>
+        <item name="colorSurface">#FBFAF6</item>
+        <item name="colorOnSurface">#17181A</item>
+        <item name="colorSurfaceVariant">#EDEAE2</item>
+        <item name="colorOnSurfaceVariant">#5B5A55</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>
