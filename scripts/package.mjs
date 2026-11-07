@@ -36,6 +36,7 @@ const INCLUDE = [
   'tools/install-android.mjs',
   'tools/fetch-pocketbase.mjs',
   'tools/shot.mjs',
+  'dist/taskcard-1.1.0-release.apk',
   'dist/taskcard.apk',
 ];
 
