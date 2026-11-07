@@ -24,12 +24,14 @@ export function Detail({ id }: { id: string }) {
   const [deleting, setDeleting] = useState(false);
   const [plan, setPlan] = useState({ priority: '', dod: '', start: '', weekly_hours: '' });
   const [tagText, setTagText] = useState('');
+  const [remindText, setRemindText] = useState('');
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [newItem, setNewItem] = useState('');
 
   useEffect(() => {
     if (!task) return;
     setTagText(task.tags ?? '');
+    setRemindText(task.remind_at ?? '');
     setItems(Array.isArray(task.checklist) ? task.checklist : []);
   }, [task]);
 
@@ -244,6 +246,20 @@ export function Detail({ id }: { id: string }) {
               onChange={(e) => setTagText(e.target.value)}
               onBlur={() => void savePlan({ tags: tagText.trim() })}
               placeholder="逗号分隔，例如：论文, 实验, 这周"
+              className="w-full border border-line/20 bg-transparent px-3 py-2 text-[12.5px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/50"
+            />
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="flex items-baseline gap-2 text-[11px] tracking-[0.18em] text-oncanvas/45">
+              提醒
+              <span className="font-mono text-[10px] tracking-normal text-oncanvas/30">浏览器通知 / App 到点提醒</span>
+            </h2>
+            <input
+              value={remindText}
+              onChange={(e) => setRemindText(e.target.value)}
+              onBlur={() => void savePlan({ remind_at: remindText.trim() })}
+              placeholder="MM-DD HH:mm，例如 11-08 09:00（留空不提醒）"
               className="w-full border border-line/20 bg-transparent px-3 py-2 text-[12.5px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/50"
             />
           </section>

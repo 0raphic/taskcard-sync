@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TaskCard } from '../components/TaskCard';
 import { useTasks, useUpdateTask } from '../lib/data';
+import { askNotify, notifyPermission, tickReminders } from '../lib/reminders';
 import { Link } from '../lib/router';
 import { isDone, isOverdue, isToday, type Task } from '../lib/types';
 
@@ -36,9 +37,16 @@ export function Board() {
   const [held, setHeld] = useState<Task | null>(null);
   const [focus, setFocus] = useState<'all' | 'today' | 'overdue' | 'checklist'>('all');
   const [q, setQ] = useState('');
+  const [notifyState, setNotifyState] = useState(notifyPermission());
   const holdTimer = useRef<number | null>(null);
   const holdStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
+
+  useEffect(() => {
+    tickReminders(tasks ?? []);
+    const id = window.setInterval(() => tickReminders(tasks ?? []), 30_000);
+    return () => window.clearInterval(id);
+  }, [tasks]);
 
   async function printToday(ids: string[]) {
     setPrintingToday(true);
@@ -158,14 +166,25 @@ export function Board() {
             {overdue.length > 0 && today.length > 0 && ' · '}
             {today.length > 0 && <b className="font-semibold">{today.length} 张今天到期</b>}
           </span>
-          <button
-            type="button"
-            disabled={printingToday}
-            onClick={() => printToday([...overdue, ...today].slice(0, 8).map((t) => t.id))}
-            className="ml-auto border border-oncanvas/25 px-3 py-1 text-[11px] text-oncanvas/80 hover:border-oncanvas/50 disabled:opacity-50"
-          >
-            {printingToday ? '排版中…' : '生成今日一页 →'}
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {notifyState === 'default' && (
+              <button
+                type="button"
+                onClick={async () => setNotifyState(await askNotify() ? 'granted' : Notification.permission)}
+                className="border border-seal/60 px-3 py-1 text-[11px] text-seal hover:bg-seal/10"
+              >
+                开启到期通知
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={printingToday}
+              onClick={() => printToday([...overdue, ...today].slice(0, 8).map((t) => t.id))}
+              className="border border-oncanvas/25 px-3 py-1 text-[11px] text-oncanvas/80 hover:border-oncanvas/50 disabled:opacity-50"
+            >
+              {printingToday ? '排版中…' : '生成今日一页 →'}
+            </button>
+          </div>
         </div>
       )}
       {flash && <p className="text-[12px] text-seal">{flash}</p>}

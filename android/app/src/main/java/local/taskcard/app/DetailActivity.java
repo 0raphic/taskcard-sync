@@ -30,7 +30,7 @@ public class DetailActivity extends AppCompatActivity {
     private static final String EXTRA_ID = "id";
     private String id;
     private Task task;
-    private EditText title, due, estimate, priority, dod, start, materials, notes, weekly, tags;
+    private EditText title, due, estimate, priority, dod, start, materials, notes, weekly, tags, remind;
     private LinearLayout checklistBox;
     private JSONArray checklist = new JSONArray();
     private ChipGroup statusGroup;
@@ -107,6 +107,7 @@ public class DetailActivity extends AppCompatActivity {
         materials = field(body, "材料", InputType.TYPE_CLASS_TEXT);
         notes = field(body, "备注", InputType.TYPE_CLASS_TEXT);
         tags = field(body, "标签（逗号分隔）", InputType.TYPE_CLASS_TEXT);
+        remind = field(body, "提醒（MM-DD HH:mm，留空不提醒）", InputType.TYPE_CLASS_TEXT);
 
         body.addView(Ui.label(this, "清单"));
         checklistBox = Ui.column(this);
@@ -204,6 +205,7 @@ public class DetailActivity extends AppCompatActivity {
         materials.setText(task.materials);
         notes.setText(task.notes);
         tags.setText(task.tags);
+        remind.setText(task.remindAt);
         checklist = task.checklist != null ? task.checklist : new JSONArray();
         renderChecklist();
         progressBar.setProgress(task.progress);
@@ -225,6 +227,7 @@ public class DetailActivity extends AppCompatActivity {
         b.put("materials", materials.getText().toString().trim());
         b.put("notes", notes.getText().toString().trim());
         b.put("tags", tags.getText().toString().trim());
+            b.put("remind_at", remind.getText().toString().trim());
         String est = estimate.getText().toString().trim();
         b.put("estimate_min", est.isEmpty() ? 0 : Integer.parseInt(est));
         String wk = weekly.getText().toString().trim();
@@ -295,6 +298,7 @@ public class DetailActivity extends AppCompatActivity {
                 @Override
                 public void ok(String b) {
                     Ui.toast(DetailActivity.this, "已保存");
+                    Reminders.scheduleAll(DetailActivity.this);
                     finish();
                 }
 

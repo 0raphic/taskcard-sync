@@ -1,5 +1,6 @@
 package local.taskcard.app;
 
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.ViewGroup;
@@ -86,6 +87,13 @@ public class MainActivity extends AppCompatActivity {
                     })
                     .setCancelable(false)
                     .show();
+        }
+
+        Reminders.scheduleAll(this);
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 7);
         }
 
         board = new BoardFragment();

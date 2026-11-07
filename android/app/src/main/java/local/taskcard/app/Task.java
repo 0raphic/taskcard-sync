@@ -16,6 +16,7 @@ public class Task {
     public String materials = "";
     public String notes = "";
     public String tags = "";
+    public String remindAt = "";
     public int estimateMin = 0;
     public int progress = 0;
     public int weeklyHours = 0;
@@ -38,6 +39,7 @@ public class Task {
         t.materials = o.optString("materials");
         t.notes = o.optString("notes");
         t.tags = o.optString("tags");
+        t.remindAt = o.optString("remind_at");
         t.estimateMin = o.optInt("estimate_min");
         t.progress = o.optInt("progress");
         t.weeklyHours = o.optInt("weekly_hours");

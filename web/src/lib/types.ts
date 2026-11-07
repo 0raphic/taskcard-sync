@@ -31,6 +31,7 @@ export type Task = {
   dod?: string;
   weekly_hours?: number;
   tags?: string;
+  remind_at?: string;
   checklist?: ChecklistItem[];
   draft?: boolean;
   client_updated_at?: string;
