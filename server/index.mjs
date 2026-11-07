@@ -616,6 +616,28 @@ app.post('/ds-api/cards.revoke', async (req, res) => {
 });
 
 // 补印：按原来的短码重新出空白卡（码不变，纸换了）；可以一次补一批
+
+async function createBlankCards(count, kind = 'short') {
+  const created = [];
+  for (let i = 0; i < count; i += 1) {
+    const r = await pbReq('/api/collections/tasks/records', {
+      method: 'POST',
+      body: {
+        title: `空白卡 ${String(i + 1).padStart(2, '0')}`,
+        kind,
+        status: 'todo',
+        draft: true,
+        milestones: [],
+      },
+    });
+    if (!r.ok) {
+      throw new Error(`建空白卡失败：${r.json?.message || `http ${r.status}`}`);
+    }
+    created.push(r.json);
+  }
+  return created;
+}
+
 app.post('/ds-api/cards.reprint', async (req, res) => {
   const list = Array.isArray(req.body?.codes)
     ? req.body.codes.map((c) => String(c || '').trim()).filter(Boolean)
@@ -641,15 +663,33 @@ app.post('/ds-api/cards.reprint', async (req, res) => {
       codes.set(task.id, code);
     }
 
+    // 可选：用新空白卡把这一页的剩下的位置填满（补 1 张也照样出一整页 8 格）
+    let filled = 0;
+    if (req.body?.fill) {
+      const need = (8 - (tasks.length % 8)) % 8;
+      if (need > 0) {
+        const kind = tasks.every((t) => t.kind === 'long') ? 'long' : 'short';
+        const extra = await createBlankCards(need, kind);
+        const extraCodes = await ensureCodes(extra);
+        extra.forEach((t) => {
+          tasks.push(t);
+          codes.set(t.id, extraCodes.get(t.id));
+        });
+        filled = extra.length;
+      }
+    }
+
     const baseUrl = baseUrlOf(req.body?.base_url) || `http://${lanIp()}:${WEB_PORT}`;
     const payload = cardsPayload(tasks, codes, baseUrl, { blank: true });
-    const out = await renderCards(payload, { doubleSided: !!req.body?.double_sided });
+    const doubleSided = req.body?.double_sided !== false;
+    const out = await renderCards(payload, { doubleSided });
     if (!out.buffer) return res.status(out.status || 500).json({ ok: false, error: out.error });
 
     res.setHeader('content-type', 'application/pdf');
     res.setHeader('content-disposition', `inline; filename="${pdfName('reprint')}"`);
     res.setHeader('x-card-count', String(payload.tasks.length));
-    res.setHeader('x-card-codes', list.join(','));
+    res.setHeader('x-fill-count', String(filled));
+    res.setHeader('x-card-codes', payload.tasks.map((t) => codes.get(t.id)).filter(Boolean).join(','));
     res.send(out.buffer);
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
@@ -664,26 +704,7 @@ app.post('/ds-api/cards.blank', async (req, res) => {
   if (!baseUrl) return res.status(400).json({ ok: false, error: '地址要像 http://192.168.0.108:8088' });
 
   try {
-    const created = [];
-    for (let i = 0; i < count; i += 1) {
-      const r = await pbReq('/api/collections/tasks/records', {
-        method: 'POST',
-        body: {
-          title: `空白卡 ${String(i + 1).padStart(2, '0')}`,
-          kind,
-          status: 'todo',
-          draft: true,
-          milestones: [],
-        },
-      });
-      if (!r.ok) {
-        return res.status(500).json({
-          ok: false,
-          error: `建空白卡失败：${r.json?.message || `http ${r.status}`}`,
-        });
-      }
-      created.push(r.json);
-    }
+    const created = await createBlankCards(count, kind);
 
     const codes = await ensureCodes(created);
     const payload = cardsPayload(created, codes, baseUrl, { blank: true });

@@ -3,24 +3,21 @@ import { useEffect, useState } from 'react';
 type Kind = 'short' | 'long';
 
 const SHORT_FIELDS = [
-  ['任务', '一句话说清要交付什么'],
+  ['任务名称', '一句话说清要交付什么'],
   ['优先级', '重要且紧急 / 重要不紧急 / 紧急不重要 / 其他'],
   ['完成标准', '做到什么程度算完'],
-  ['下一步', '下一个具体动作'],
-  ['截止 · 时间盒', '____  ·  ____ 分'],
-  ['情境', '电脑 / 电话 / 外出 / 家里 / 随时'],
+  ['开始 / 截止', '两个时间点'],
   ['材料', '要不要借、要不要买'],
-  ['复盘', '实际 ___ 分 · 一句体会'],
+  ['备注', '卡在哪、等谁'],
+  ['任务状态', '待办 / 进行中 / 完成 / 搁置'],
 ];
 
 const LONG_FIELDS = [
-  ['O 目标', '一个季度只写一句'],
-  ['KR 关键结果', 'K1 / K2 / K3，写到能打勾'],
-  ['周期', '起 ___ 止 ___ · 每周 ___ 小时'],
-  ['里程碑', '三个可勾选的小目标'],
-  ['进度', '十个格子，做一格涂一格'],
-  ['资源', '要谁配合、要什么'],
-  ['本周', '推进 / 卡点 / 下一步'],
+  ['任务名称', '一句话说清要交付什么'],
+  ['目标', '一个阶段只写一句'],
+  ['周期 / 周投入', '起 ___ 止 ___ · 每周 ___ 小时'],
+  ['任务状态', '待办 / 进行中 / 完成 / 搁置'],
+  ['短期里程碑', '三条能打勾的小目标'],
 ];
 
 function CardPreview({ kind }: { kind: Kind }) {
@@ -70,7 +67,7 @@ export function Print() {
   const [netUrl, setNetUrl] = useState('');
   const [kind, setKind] = useState<Kind>('short');
   const [count, setCount] = useState(8);
-  const [doubleSided, setDoubleSided] = useState(false);
+  const [doubleSided, setDoubleSided] = useState(true);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);

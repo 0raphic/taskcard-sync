@@ -216,38 +216,45 @@ def draw_long(c, x, y, t, url):
     field(c, x + pad, body, tw, "资源", t.get("resources", ""))
 
 
-# ---------- 空白表：给手写用的版式 ----------
-# 方法论：GTD 的「下一步行动」+ 完成标准（DoD）+ 艾森豪威尔优先级
-#         + 时间盒/能量预算 + 情境标签 + 复盘（实际用时与一句体会）
-#         长期卡用 OKR（O + 3 条可打勾的 KR）+ 里程碑 + 10 格手涂进度 + 周复盘
+# ---------- 空白表：CSGO 印花集 / 工业蓝图风 ----------
+# 方法论：短期 = 优先级 + 完成标准（DoD）+ 时间盒（开始/截止）+ 任务状态
+#         长期 = 目标 + 周期 + 周投入 + 短期里程碑 + 任务状态
 
-def draw_qr_compact(c, x, y, url, code, size_mm=17):
-    """空白卡用：二维码大一点（≥17mm 才好扫），下面只留短码，不写「扫码更新」。"""
-    size = size_mm * mm
-    tmp = Path(tempfile.gettempdir()) / f"qr_{code}.png"
-    qr_image(url, str(tmp))
-    c.drawImage(str(tmp), x, y, size, size, preserveAspectRatio=True, mask="auto")
-    text(c, code, x, y - 3.4 * mm, 6.0, color=SOFT)
+PINK = Color(1.0, 0.36, 0.72)
+PURPLE = Color(0.58, 0.42, 1.0)
+CYAN = Color(0.35, 0.86, 1.0)
+HAIR = HexColor("#111111")
 
-def rule(c, x1, x2, y, w=0.35, color=LINE):
+
+def rule(c, x1, x2, y, w=0.4, color=HAIR):
     c.setStrokeColor(color)
     c.setLineWidth(w)
     c.line(x1, y, x2, y)
 
 
-def label(c, s, x, y, size=5.4):
-    text(c, s, x, y, size, color=SOFT)
+def label(c, s, x, y, size=5.4, color=SOFT):
+    text(c, s, x, y, size, color=color)
 
 
-def small_box(c, x, y, size=2.2):
-    c.setStrokeColor(SOFT)
-    c.setLineWidth(0.45)
-    c.rect(x, y - 0.5 * mm, size * mm, size * mm, stroke=1, fill=0)
-    return x + (size + 1.1) * mm
+def tiny(c, s, x, y, size=3.6, color=SOFT, align="l"):
+    c.setFont("Courier", size)
+    c.setFillColor(color)
+    if align == "r":
+        c.drawRightString(x, y, s)
+    elif align == "c":
+        c.drawCentredString(x, y, s)
+    else:
+        c.drawString(x, y, s)
 
 
-def chips(c, x, y, labels, size=5.2, gap=3.2 * mm):
-    """一组小方框选项，返回结束的 x。"""
+def small_box(c, x, y, size=2.2, color=HAIR):
+    c.setStrokeColor(color)
+    c.setLineWidth(0.5)
+    c.rect(x, y - 0.55 * mm, size * mm, size * mm, stroke=1, fill=0)
+    return x + (size + 1.2) * mm
+
+
+def chips(c, x, y, labels, size=5.0, gap=3.0 * mm):
     cx = x
     for lab in labels:
         cx = small_box(c, cx, y)
@@ -256,157 +263,235 @@ def chips(c, x, y, labels, size=5.2, gap=3.2 * mm):
     return cx
 
 
+def crosshair(c, x, y, s=1.6 * mm):
+    c.setStrokeColor(HAIR)
+    c.setLineWidth(0.35)
+    c.line(x - s, y, x + s, y)
+    c.line(x, y - s, x, y + s)
+
+
+def corners(c, x, y, inset=1.6 * mm):
+    crosshair(c, x + inset, y + inset, 1.1 * mm)
+    crosshair(c, x + CARD_W - inset, y + inset, 1.1 * mm)
+    crosshair(c, x + inset, y + CARD_H - inset, 1.1 * mm)
+    crosshair(c, x + CARD_W - inset, y + CARD_H - inset, 1.1 * mm)
+
+
+def barcode(c, x, y, w, h, seed_text, gap=0.9 * mm):
+    """确定性伪随机条码 + 三条低饱和镭射渐变。"""
+    seed = sum(ord(ch) * (i + 7) for i, ch in enumerate(seed_text)) or 7
+    bars = []
+    used = 0.0
+    i = 0
+    while used < w - gap:
+        seed = (seed * 1103515245 + 12345) % 2147483648
+        bw = [0.22, 0.34, 0.5][seed % 3] * mm
+        if used + bw > w - gap:
+            break
+        bars.append((x + used, bw, (seed >> 5) % 4 != 0))
+        used += bw + (0.26 + 0.14 * (i % 3)) * mm
+        i += 1
+    for bx, bw, on in bars:
+        if on:
+            c.setFillColor(HAIR)
+            c.rect(bx, y, bw, h, stroke=0, fill=1)
+    # 镭射条纹：低饱和、半透明，压在条码上
+    for j, col in enumerate((PINK, PURPLE, CYAN)):
+        c.saveState()
+        c.setFillAlpha(0.32)
+        c.setFillColor(col)
+        c.rect(x + 2 * mm, y + h * (0.2 + j * 0.26), w * 0.62, 0.32 * mm, stroke=0, fill=1)
+        c.restoreState()
+
+
+def pixels(c, x, y, cols=8, rows=3, step=1.15 * mm, size=0.62 * mm):
+    c.setFillColor(HAIR)
+    for ix in range(cols):
+        for iy in range(rows):
+            if (ix * 5 + iy * 3 + ix * iy) % 4 == 0:
+                c.rect(x + ix * step, y + iy * step, size, size, stroke=0, fill=1)
+
+
+def heart(c, x, y, size=2.4 * mm):
+    c.setFillColor(HAIR)
+    p = c.beginPath()
+    s = size
+    p.moveTo(x, y)
+    p.curveTo(x - s, y + s * 0.9, x - s, y + s * 1.9, x, y + s * 1.45)
+    p.curveTo(x + s, y + s * 1.9, x + s, y + s * 0.9, x, y)
+    c.drawPath(p, stroke=0, fill=1)
+
+
+def serial(code: str) -> str:
+    h = sum(ord(ch) for ch in code) * 97 % 10000
+    return f"TC/{code.upper()}/{h:04d}"
+
+
+def xxy(c, x, y, size=12, color=HAIR, track=0.06):
+    """几何字标：手动加字距。"""
+    cx = x
+    for ch in "XXY":
+        c.setFont(FONT_B, size)
+        c.setFillColor(color)
+        c.drawString(cx, y, ch)
+        cx += pdfmetrics.stringWidth(ch, FONT_B, size) + size * track
+
+
+def draw_qr_compact(c, x, y, url, code, size_mm=16.5):
+    size = size_mm * mm
+    tmp = Path(tempfile.gettempdir()) / f"qr_{code}.png"
+    qr_image(url, str(tmp))
+    c.drawImage(str(tmp), x, y, size, size, preserveAspectRatio=True, mask="auto")
+    text(c, code, x, y - 3.2 * mm, 5.6, color=SOFT)
+
+
+def blank_head(c, x, y, title, kind_label, code):
+    pad = 3.0 * mm
+    top = y + CARD_H - pad
+    xxy(c, x + pad, top - 4.4 * mm, 11)
+    tiny(c, "TASK CARD / XXY-01", x + pad + 20 * mm, top - 1.6 * mm, 3.2, SOFT)
+    text(c, title, x + pad + 20 * mm, top - 4.6 * mm, 5.4, color=SOFT)
+    tiny(c, "SHORT 1:8 A4" if kind_label == "短期" else "LONG 1:8 A4",
+         x + CARD_W - pad, top - 1.6 * mm, 3.2, SOFT, "r")
+
+
+def blank_footer(c, x, y, code):
+    pad = 3.0 * mm
+    barcode(c, x + pad, y + 2.2 * mm, 34 * mm, 3.4 * mm, code)
+    tiny(c, "// XXY.PRINT  " + serial(code), x + pad + 36 * mm, y + 3.2 * mm, 3.0, SOFT)
+    heart(c, x + CARD_W - pad - 3 * mm, y + 2.6 * mm, 2.2 * mm)
+    pixels(c, x + pad + 36 * mm, y + 5.6 * mm, 5, 1, 1.2 * mm, 0.5 * mm)
+
+
 def draw_blank_short(c, x, y, code, url):
-    pad = 3.2 * mm
-    qsize = 17 * mm
-    qx, qy = x + CARD_W - pad - qsize, y + CARD_H - pad - qsize
-    draw_qr_compact(c, qx, qy, url, code, 17)
-    right_w = CARD_W - 2 * pad - qsize - 3 * mm
+    pad = 3.0 * mm
+    qsize = 16.5 * mm
+    right_w = CARD_W - 2 * pad - qsize - 2.5 * mm
+    qx = x + CARD_W - pad - qsize
+    qy = y + CARD_H - 7 * mm - qsize
+    corners(c, x, y)
 
-    text(c, "任务卡", x + pad, y + CARD_H - pad - 2.2 * mm, 6.4, font=FONT_B, color=ACCENT)
-    label(c, "短期 · 1/8 A4", x + pad + 13 * mm, y + CARD_H - pad - 2.2 * mm, 5.2)
+    blank_head(c, x, y, "任务卡", "短期", code)
+    draw_qr_compact(c, qx, qy, url, code, 16.5)
 
-    # 1 标题
-    label(c, "任务（一句话说清要交付什么）", x + pad, y + CARD_H - 10.4 * mm)
-    rule(c, x + pad, x + pad + right_w, y + CARD_H - 15.4 * mm, 0.45)
-    rule(c, x + pad, x + pad + right_w, y + CARD_H - 20.2 * mm, 0.45)
+    # 任务名称
+    label(c, "任务名称", x + pad, y + CARD_H - 12.6 * mm)
+    rule(c, x + pad, x + pad + right_w, y + CARD_H - 17.4 * mm, 0.5)
+    rule(c, x + pad, x + pad + right_w, y + CARD_H - 22.0 * mm, 0.5)
 
-    # 2 优先级（艾森豪威尔）
-    py = y + CARD_H - 25.4 * mm
+    # 优先级
+    py = y + CARD_H - 27.6 * mm
     label(c, "优先级", x + pad, py)
-    chips(c, x + pad + 10 * mm, py, ("重要且紧急", "重要不紧急", "紧急不重要", "其他"))
+    chips(c, x + pad + 11 * mm, py, ("重要且紧急", "重要不紧急", "紧急不重要", "其他"), 4.8, 2.4 * mm)
 
-    # 3 完成标准
-    dy = y + CARD_H - 31.0 * mm
+    # 开始 / 截止
+    ry = y + CARD_H - 33.4 * mm
+    label(c, "开始", x + pad, ry)
+    rule(c, x + pad + 8.5 * mm, x + pad + 32 * mm, ry - 0.7 * mm)
+    label(c, "截止", x + pad + 38 * mm, ry)
+    rule(c, x + pad + 46.5 * mm, x + pad + 70 * mm, ry - 0.7 * mm)
+
+    # 完成标准（两行）
+    dy = y + CARD_H - 39.0 * mm
     label(c, "完成标准", x + pad, dy)
-    rule(c, x + pad + 12 * mm, x + CARD_W - pad, dy - 0.6 * mm)
+    rule(c, x + pad + 14 * mm, x + CARD_W - pad, dy - 0.7 * mm, 0.4)
+    rule(c, x + pad, x + CARD_W - pad, dy - 6.2 * mm, 0.35)
 
-    # 4 下一步行动
-    ny = y + CARD_H - 36.4 * mm
-    label(c, "下一步", x + pad, ny)
-    rule(c, x + pad + 10 * mm, x + CARD_W - pad, ny - 0.6 * mm)
+    # 材料 / 备注
+    label(c, "材料", x + pad, y + CARD_H - 52.6 * mm)
+    rule(c, x + pad + 8.5 * mm, x + CARD_W - pad, y + CARD_H - 53.2 * mm)
+    label(c, "备注", x + pad, y + CARD_H - 57.8 * mm)
+    rule(c, x + pad + 8.5 * mm, x + CARD_W - pad, y + CARD_H - 58.4 * mm)
 
-    # 5 截止 / 时间盒 / 能量
-    my = y + CARD_H - 42.2 * mm
-    label(c, "截止", x + pad, my)
-    rule(c, x + pad + 7 * mm, x + pad + 22 * mm, my - 0.6 * mm)
-    label(c, "时间盒", x + pad + 26 * mm, my)
-    rule(c, x + pad + 36 * mm, x + pad + 45 * mm, my - 0.6 * mm)
-    label(c, "分", x + pad + 46.5 * mm, my)
-    ex = x + pad + 54 * mm
-    label(c, "能量", ex, my)
-    chips(c, ex + 8 * mm, my, ("低", "中", "高"), 5.0, 2.4 * mm)
+    # 任务状态
+    sy = y + CARD_H - 63.6 * mm
+    label(c, "任务状态", x + pad, sy)
+    chips(c, x + pad + 14 * mm, sy, ("待办", "进行中", "完成", "搁置"), 5.0, 3.4 * mm)
 
-    # 6 情境（在哪做）
-    cy = y + CARD_H - 47.8 * mm
-    label(c, "情境", x + pad, cy)
-    chips(c, x + pad + 10 * mm, cy, ("电脑", "电话", "外出", "家里", "随时"), 5.0, 2.6 * mm)
-
-    # 7 材料
-    sy = y + CARD_H - 53.4 * mm
-    label(c, "材料", x + pad, sy)
-    rule(c, x + pad + 10 * mm, x + CARD_W - pad, sy - 0.6 * mm)
-
-    # 8 复盘
-    ry = y + CARD_H - 59.2 * mm
-    label(c, "复盘", x + pad, ry)
-    label(c, "实际", x + pad + 9.5 * mm, ry, 5.0)
-    rule(c, x + pad + 14 * mm, x + pad + 26 * mm, ry - 0.6 * mm)
-    label(c, "分", x + pad + 27 * mm, ry, 5.0)
-    label(c, "一句体会", x + pad + 33 * mm, ry, 5.0)
-    rule(c, x + pad + 46 * mm, x + CARD_W - pad, ry - 0.6 * mm)
-
-    # 9 备注（卡在哪 / 等谁）
-    by = y + CARD_H - 65 * mm
-    label(c, "备注", x + pad, by)
-    rule(c, x + pad + 10 * mm, x + CARD_W - pad, by - 0.6 * mm)
-
-    text(c, "手机扫码 → 改成「进行中 / 完成」", x + pad, y + 3.0 * mm, 5.0, color=SOFT)
+    blank_footer(c, x, y, code)
 
 
 def draw_blank_long(c, x, y, code, url):
-    pad = 3.2 * mm
-    qsize = 17 * mm
-    qx, qy = x + CARD_W - pad - qsize, y + CARD_H - pad - qsize
-    draw_qr_compact(c, qx, qy, url, code, 17)
-    right_w = CARD_W - 2 * pad - qsize - 3 * mm
+    pad = 3.0 * mm
+    qsize = 16.5 * mm
+    right_w = CARD_W - 2 * pad - qsize - 2.5 * mm
+    qx = x + CARD_W - pad - qsize
+    qy = y + CARD_H - 7 * mm - qsize
+    corners(c, x, y)
 
-    text(c, "目标卡", x + pad, y + CARD_H - pad - 2.2 * mm, 6.4, font=FONT_B, color=ACCENT)
-    label(c, "长期 · OKR", x + pad + 13 * mm, y + CARD_H - pad - 2.2 * mm, 5.2)
+    blank_head(c, x, y, "目标卡", "长期", code)
+    draw_qr_compact(c, qx, qy, url, code, 16.5)
 
-    # 1 目标 O
-    label(c, "O 目标（一个季度只写一句）", x + pad, y + CARD_H - 10.2 * mm)
-    rule(c, x + pad, x + pad + right_w, y + CARD_H - 15.2 * mm, 0.45)
+    # 任务名称
+    label(c, "任务名称", x + pad, y + CARD_H - 12.6 * mm)
+    rule(c, x + pad, x + pad + right_w, y + CARD_H - 17.4 * mm, 0.5)
+    rule(c, x + pad, x + pad + right_w, y + CARD_H - 21.6 * mm, 0.5)
 
-    # 2 关键结果 KR（3 条）
-    label(c, "KR 关键结果（写到能打勾的程度）", x + pad, y + CARD_H - 20.0 * mm)
-    for i in range(3):
-        ly = y + CARD_H - (24.8 + i * 4.9) * mm
-        text(c, f"K{i + 1}", x + pad, ly, 5.0, color=SOFT)
-        rule(c, x + pad + 6.5 * mm, x + CARD_W - pad, ly - 0.6 * mm)
+    # 目标
+    label(c, "目标", x + pad, y + CARD_H - 27.0 * mm)
+    rule(c, x + pad, x + CARD_W - pad, y + CARD_H - 31.6 * mm, 0.5)
+    rule(c, x + pad, x + CARD_W - pad, y + CARD_H - 35.6 * mm, 0.4)
 
-    # 3 周期 / 每周投入
-    cy = y + CARD_H - 40.4 * mm
+    # 周期
+    cy = y + CARD_H - 40.8 * mm
     label(c, "周期", x + pad, cy)
-    label(c, "起", x + pad + 8 * mm, cy, 4.9)
-    rule(c, x + pad + 11 * mm, x + pad + 21 * mm, cy - 0.6 * mm)
-    label(c, "止", x + pad + 24 * mm, cy, 4.9)
-    rule(c, x + pad + 27 * mm, x + pad + 37 * mm, cy - 0.6 * mm)
-    label(c, "每周投入", x + pad + 42 * mm, cy)
-    rule(c, x + pad + 54 * mm, x + pad + 62 * mm, cy - 0.6 * mm)
-    label(c, "小时", x + pad + 63 * mm, cy)
+    label(c, "起", x + pad + 8 * mm, cy, 4.8)
+    rule(c, x + pad + 11 * mm, x + pad + 26 * mm, cy - 0.7 * mm)
+    label(c, "止", x + pad + 29 * mm, cy, 4.8)
+    rule(c, x + pad + 32 * mm, x + pad + 47 * mm, cy - 0.7 * mm)
 
-    # 4 里程碑（三个可勾选）
-    my = y + CARD_H - 46.2 * mm
-    label(c, "里程碑", x + pad, my)
-    mx = x + pad + 11 * mm
-    for _ in range(3):
-        mx = small_box(c, mx, my)
-        rule(c, mx, mx + 15 * mm, my - 0.6 * mm)
-        mx += 18 * mm
+    # 周投入
+    wy = y + CARD_H - 46.2 * mm
+    label(c, "周投入", x + pad, wy)
+    rule(c, x + pad + 12 * mm, x + pad + 24 * mm, wy - 0.7 * mm)
+    label(c, "小时 / 周", x + pad + 25 * mm, wy, 4.8)
 
-    # 5 进度：10 格手涂
-    gy = y + CARD_H - 52.2 * mm
-    label(c, "进度", x + pad, gy)
-    gx = x + pad + 10 * mm
-    for _ in range(10):
-        c.setStrokeColor(SOFT)
-        c.setLineWidth(0.45)
-        c.rect(gx, gy - 0.6 * mm, 3.0 * mm, 3.0 * mm, stroke=1, fill=0)
-        gx += 3.6 * mm
-    label(c, "%", gx + 0.8 * mm, gy, 5.0)
+    # 状态
+    sy = y + CARD_H - 51.4 * mm
+    label(c, "任务状态", x + pad, sy)
+    chips(c, x + pad + 14 * mm, sy, ("待办", "进行中", "完成", "搁置"), 5.0, 3.4 * mm)
 
-    # 6 资源 / 协作
-    sy = y + CARD_H - 58.2 * mm
-    label(c, "资源", x + pad, sy)
-    rule(c, x + pad + 10 * mm, x + CARD_W - pad, sy - 0.6 * mm)
+    # 短期里程碑（3 条）
+    label(c, "短期里程碑", x + pad, y + CARD_H - 56.6 * mm)
+    for i in range(3):
+        my = y + CARD_H - (60.6 + i * 3.2) * mm
+        bx = small_box(c, x + pad, my)
+        rule(c, bx + 0.6 * mm, x + CARD_W - pad, my - 0.7 * mm, 0.35)
 
-    # 7 本周复盘两行
-    label(c, "本周：推进 / 卡点 / 下一步", x + pad, y + CARD_H - 64.0 * mm)
-    rule(c, x + pad, x + CARD_W - pad, y + CARD_H - 67.4 * mm)
-
-    text(c, "手机扫码 → 改进度、记一笔", x + pad, y + 2.6 * mm, 5.0, color=SOFT)
+    blank_footer(c, x, y, code)
 
 
 def draw_blank_back(c, x, y, code):
-    pad = 3.2 * mm
-    text(c, "复盘卡", x + pad, y + CARD_H - pad - 2.2 * mm, 6.4, font=FONT_B, color=ACCENT)
-    text(c, code, x + CARD_W - pad - 14 * mm, y + CARD_H - pad - 2.2 * mm, 5.4, color=SOFT)
+    pad = 3.0 * mm
+    corners(c, x, y)
+    top = y + CARD_H - pad
 
-    by = y + CARD_H - 12 * mm
-    label(c, "实际用时", x + pad, by)
-    rule(c, x + pad + 14 * mm, x + pad + 32 * mm, by - 0.6 * mm)
-    label(c, "完成日期", x + pad + 40 * mm, by)
-    rule(c, x + pad + 54 * mm, x + pad + 72 * mm, by - 0.6 * mm)
+    # 大 XXY 水印（浅灰，当印刷纹理用）+ 复盘标题
+    xxy(c, x + 8 * mm, y + 9.5 * mm, 30, color=HexColor("#e6e6e6"))
+    xxy(c, x + pad, top - 4.6 * mm, 11)
+    text(c, "复盘卡", x + pad + 20 * mm, top - 4.8 * mm, 5.4, color=SOFT)
+    tiny(c, "REVIEW / " + serial(code), x + CARD_W - pad, top - 1.8 * mm, 3.2, SOFT, "r")
 
-    body = y + CARD_H - 20 * mm
-    for lab, n in (("做成了什么", 2), ("卡在哪 / 为什么", 2), ("下次怎么改", 2)):
-        label(c, lab, x + pad, body, 5.6)
-        body -= 5 * mm
-        for _ in range(n):
-            rule(c, x + pad, x + CARD_W - pad, body)
-            body -= 5.4 * mm
-        body -= 1.2 * mm
+    # 实际用时 / 完成日期
+    ry = y + CARD_H - 12.4 * mm
+    label(c, "实际用时", x + pad, ry)
+    rule(c, x + pad + 15 * mm, x + pad + 32 * mm, ry - 0.7 * mm)
+    label(c, "完成日期", x + pad + 38 * mm, ry)
+    rule(c, x + pad + 53 * mm, x + pad + 72 * mm, ry - 0.7 * mm)
+
+    # 三行复盘
+    body = y + CARD_H - 20.2 * mm
+    for lab in ("做成了什么", "卡在哪 / 为什么", "下次怎么改"):
+        label(c, lab, x + pad, body)
+        rule(c, x + pad + 22 * mm, x + CARD_W - pad, body - 0.7 * mm, 0.35)
+        rule(c, x + pad, x + CARD_W - pad, body - 6.4 * mm, 0.3)
+        body -= 11.4 * mm
+
+    # 装饰
+    barcode(c, x + pad, y + 2.4 * mm, 40 * mm, 3.4 * mm, code)
+    tiny(c, "// XXY.REVIEW  0x%04X" % (abs(hash(code)) % 0xFFFF), x + pad + 42 * mm, y + 3.4 * mm, 3.0, SOFT)
+    heart(c, x + CARD_W - pad - 3 * mm, y + 2.8 * mm, 2.2 * mm)
+    pixels(c, x + pad + 42 * mm, y + 6.0 * mm, 4, 1, 1.2 * mm, 0.5 * mm)
 
 
 def draw_back(c, x, y, t, url):

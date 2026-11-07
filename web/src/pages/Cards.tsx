@@ -44,6 +44,7 @@ export function Cards() {
   const [flash, setFlash] = useState<string | null>(null);
   const [batch] = useState<string[]>(readBatch);
   const [picked, setPicked] = useState<string[]>([]);
+  const [fillSheet, setFillSheet] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -116,17 +117,23 @@ export function Cards() {
     }
   }
 
-  async function reprint(codes: string[]) {
+  async function reprint(codes: string[], fill = false) {
     setBusy(`reprint:${codes.join(',')}`);
     setFlash(null);
     try {
       const res = await fetch('/ds-api/cards.reprint', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ codes }),
+        body: JSON.stringify({ codes, fill }),
       });
       await openPdf(res);
-      setFlash(`补印 ${codes.length} 张，短码不变`);
+      const filled = Number(res.headers.get('x-fill-count') || 0);
+      const total = Number(res.headers.get('x-card-count') || codes.length);
+      setFlash(
+        filled > 0
+          ? `补印 ${codes.length} 张 + 新卡 ${filled} 张，凑满一页（共 ${total} 张），短码不变`
+          : `补印 ${codes.length} 张，短码不变`,
+      );
       setPicked([]);
     } catch (e) {
       setFlash(e instanceof Error ? e.message : String(e));
@@ -158,14 +165,25 @@ export function Cards() {
             打印新空白卡
           </Link>
           {picked.length > 0 && (
-            <button
-              type="button"
-              onClick={() => reprint(picked)}
-              disabled={busy !== null}
-              className="bg-seal px-4 py-2 text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-50"
-            >
-              补印选中的 {picked.length} 张
-            </button>
+            <>
+              <label className="flex cursor-pointer items-center gap-1.5 border border-line/20 px-3 py-2 text-[11px] text-oncanvas/60">
+                <input
+                  type="checkbox"
+                  className="accent-seal"
+                  checked={fillSheet}
+                  onChange={(e) => setFillSheet(e.target.checked)}
+                />
+                用新卡填满这页
+              </label>
+              <button
+                type="button"
+                onClick={() => reprint(picked, fillSheet)}
+                disabled={busy !== null}
+                className="bg-seal px-4 py-2 text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+              >
+                补印选中的 {picked.length} 张
+              </button>
+            </>
           )}
           {batch.length > 0 && (
             <button
