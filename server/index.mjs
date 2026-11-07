@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { existsSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import os from 'node:os';
 import { join } from 'node:path';
 import path from 'node:path';
@@ -70,6 +70,25 @@ async function llmConfig({ fresh = false } = {}) {
 }
 
 const app = express();
+
+// 写操作口令：开启后，所有改数据的请求（前端 fetch 与 PocketBase 客户端）都要带 x-write-token。
+// 只读接口和「扫码识别」不受限——否则手机上每扫一次都要输口令。
+const WRITE_FREE = new Set(['/api/realtime', '/ds-api/health', '/ds-api/net', '/ds-api/scan', '/ds-api/passcode', '/ds-api/structure', '/ds-api/ocr']);
+app.use((req, res, next) => {
+  const method = (req.method || 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next();
+  const p = req.path || '';
+  if (WRITE_FREE.has(p)) return next();
+  if (!p.startsWith('/api/') && !p.startsWith('/ds-api/')) return next();
+  passInfo()
+    .then((info) => {
+      if (!info.enabled) return next();
+      const token = String(req.get('x-write-token') || '');
+      if (token && hashPass(token, info.salt) === info.hash) return next();
+      res.status(401).json({ ok: false, error: '需要口令', need_passcode: true });
+    })
+    .catch(() => next());
+});
 
 // PocketBase 同源代理：/api 是 REST，/_ 是实时 SSE；前端只认一个地址
 const isPbPath = (pathname) => pathname.startsWith('/api') || pathname.startsWith('/_');
@@ -329,6 +348,71 @@ app.post('/ds-api/settings', async (req, res) => {
     llmCache = { at: 0, key: '', model: DEFAULT_MODEL, vision: '' };
     const cfg = await llmConfig({ fresh: true });
     res.json({ ok: true, configured: Boolean(cfg.key), model: cfg.model, vision: cfg.vision });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// 写操作口令：只存盐+哈希；开启后前端所有写请求要带 x-write-token
+let passCache = { at: 0, enabled: false, salt: '', hash: '' };
+function hashPass(code, salt) {
+  return createHash('sha256').update(`${salt}:${code}`).digest('hex');
+}
+async function passInfo({ fresh = false } = {}) {
+  if (!fresh && passCache.at && Date.now() - passCache.at < 5000) return passCache;
+  let raw = '';
+  try {
+    const token = await adminToken();
+    const j = await fetch(`${PB_URL}/api/collections/app_settings/records?perPage=1`, {
+      headers: { authorization: token },
+    }).then((r) => r.json());
+    raw = j.items?.[0]?.write_passcode || '';
+  } catch {
+    /* 读不到当作未开启 */
+  }
+  const [salt = '', hash = ''] = raw.split(':');
+  passCache = { at: Date.now(), enabled: Boolean(salt && hash), salt, hash };
+  return passCache;
+}
+async function savePass(code) {
+  const salt = code ? randomBytes(8).toString('hex') : '';
+  const hash = code ? hashPass(code, salt) : '';
+  const token = await adminToken();
+  const list = await fetch(`${PB_URL}/api/collections/app_settings/records?perPage=1`, {
+    headers: { authorization: token },
+  }).then((r) => r.json());
+  const existing = list.items?.[0];
+  const url = existing
+    ? `${PB_URL}/api/collections/app_settings/records/${existing.id}`
+    : `${PB_URL}/api/collections/app_settings/records`;
+  const r = await fetch(url, {
+    method: existing ? 'PATCH' : 'POST',
+    headers: { 'content-type': 'application/json', authorization: token },
+    body: JSON.stringify({ write_passcode: salt ? `${salt}:${hash}` : '' }),
+  });
+  if (!r.ok) throw new Error(`保存口令失败 HTTP ${r.status}`);
+  passCache = { at: 0, enabled: false, salt: '', hash: '' };
+}
+
+app.get('/ds-api/passcode', async (_req, res) => {
+  const p = await passInfo({ fresh: true });
+  res.json({ ok: true, enabled: p.enabled });
+});
+
+app.post('/ds-api/passcode', async (req, res) => {
+  const body = req.body || {};
+  const next = String(body.passcode ?? '').trim();
+  const current = String(body.current ?? '');
+  try {
+    const p = await passInfo({ fresh: true });
+    if (p.enabled && hashPass(current, p.salt) !== p.hash) {
+      return res.status(403).json({ ok: false, error: '原来的口令不对' });
+    }
+    if (next && !/^\d{4,12}$/.test(next)) {
+      return res.status(400).json({ ok: false, error: '口令用 4–12 位数字' });
+    }
+    await savePass(next);
+    res.json({ ok: true, enabled: Boolean(next) });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }

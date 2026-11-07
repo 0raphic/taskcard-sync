@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { TaskCard } from '../components/TaskCard';
 import { useTasks, useUpdateTask } from '../lib/data';
 import { Link } from '../lib/router';
@@ -26,6 +26,10 @@ export function Board() {
   const [flash, setFlash] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
+  const [held, setHeld] = useState<Task | null>(null);
+  const holdTimer = useRef<number | null>(null);
+  const holdStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressClick = useRef(false);
 
   async function printToday(ids: string[]) {
     setPrintingToday(true);
@@ -46,6 +50,45 @@ export function Board() {
       setFlash(e instanceof Error ? e.message : String(e));
     } finally {
       setPrintingToday(false);
+    }
+  }
+
+  function clearHold() {
+    if (holdTimer.current) {
+      window.clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  }
+
+  function startHold(t: Task, e: React.TouchEvent) {
+    const p = e.touches[0];
+    holdStart.current = { x: p.clientX, y: p.clientY };
+    clearHold();
+    holdTimer.current = window.setTimeout(() => {
+      suppressClick.current = true;
+      setHeld(t);
+      navigator.vibrate?.(12);
+      window.setTimeout(() => {
+        suppressClick.current = false;
+      }, 800);
+    }, 450);
+  }
+
+  function moveHold(e: React.TouchEvent) {
+    const p = e.touches[0];
+    const s = holdStart.current;
+    if (!s) return;
+    if (Math.abs(p.clientX - s.x) > 10 || Math.abs(p.clientY - s.y) > 10) clearHold();
+  }
+
+  async function moveTo(status: 'todo' | 'doing' | 'done') {
+    const t = held;
+    setHeld(null);
+    if (!t || t.status === status) return;
+    try {
+      await update(t.id, { status });
+    } catch (e) {
+      setFlash(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -82,7 +125,7 @@ export function Board() {
           </h1>
         </div>
         <p className="max-w-[34ch] text-[12px] leading-relaxed text-oncanvas/45">
-          三列就是三个阶段。按住卡片拖到另一列，状态就跟着改；手机上手点卡片进详情也能改。
+          三列就是三个阶段。电脑上按住卡片拖到另一列；手机上长按卡片，弹出来选一列。
         </p>
       </header>
 
@@ -155,6 +198,16 @@ export function Board() {
                   {items.map((t) => (
                     <div
                       key={t.id}
+                      onTouchStart={(e) => startHold(t, e)}
+                      onTouchMove={moveHold}
+                      onTouchEnd={clearHold}
+                      onTouchCancel={clearHold}
+                      onClickCapture={(e) => {
+                        if (suppressClick.current) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }
+                      }}
                       draggable
                       onDragStart={(e) => {
                         setDragging(t.id);
@@ -179,6 +232,45 @@ export function Board() {
               </section>
             );
           })}
+        </div>
+      )}
+
+      {held && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/50 md:items-center md:justify-center">
+          <button
+            type="button"
+            aria-label="取消"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setHeld(null)}
+          />
+          <div className="relative w-full border-t border-line/20 bg-canvas p-4 md:w-[420px] md:border md:border-line/25">
+            <p className="truncate text-[13px] font-medium text-oncanvas/85">{held.title}</p>
+            <p className="mt-1 text-[11px] text-oncanvas/40">移到哪一列？</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {COLUMNS.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  disabled={held.status === c.key}
+                  onClick={() => moveTo(c.key)}
+                  className={`border px-3 py-3 text-[12px] ${
+                    held.status === c.key
+                      ? 'border-line/20 text-oncanvas/25'
+                      : 'border-line/25 text-oncanvas/80 hover:border-seal/60 hover:text-oncanvas'
+                  }`}
+                >
+                  {c.title}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setHeld(null)}
+              className="mt-2 w-full border border-line/15 px-3 py-2 text-[12px] text-oncanvas/50"
+            >
+              取消
+            </button>
+          </div>
         </div>
       )}
 

@@ -1,3 +1,4 @@
+import { PasscodeGate } from './components/PasscodeGate';
 import { Shell } from './components/Shell';
 import { usePathname } from './lib/router';
 import { Board } from './pages/Board';
@@ -14,7 +15,14 @@ export function App() {
 
   // 扫码落地页不套外壳：手机上要像一张卡，而不是一个后台
   const landing = /^\/t\/([^/]+)\/?$/.exec(path);
-  if (landing) return <Landing code={decodeURIComponent(landing[1])} />;
+  if (landing) {
+    return (
+      <>
+        <Landing code={decodeURIComponent(landing[1])} />
+        <PasscodeGate />
+      </>
+    );
+  }
 
   const detail = /^\/tasks\/([^/]+)\/?$/.exec(path);
   let page = <Board />;
@@ -26,7 +34,12 @@ export function App() {
   else if (path.startsWith('/settings')) page = <Settings />;
   else if (path !== '/' && path !== '') page = <NotFound path={path} />;
 
-  return <Shell>{page}</Shell>;
+  return (
+    <>
+      <Shell>{page}</Shell>
+      <PasscodeGate />
+    </>
+  );
 }
 
 function NotFound({ path }: { path: string }) {
