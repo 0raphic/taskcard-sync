@@ -114,6 +114,35 @@ const pbProxy = createProxyMiddleware({
 app.use(pbProxy);
 app.use(express.json({ limit: '20mb' }));
 
+// 写接口要登录：/ds-api 下除健康检查、局域网探测、口令状态外，都需要 PocketBase 用户 token。
+// 纸卡扫码页走的是 PB 自己的 /api（拿着卡就是权限），不在这里拦。
+const DS_OPEN = new Set(['/ds-api/health', '/ds-api/net', '/ds-api/passcode']);
+
+async function userFromReq(req) {
+  const m = /^Bearer (.+)$/.exec(String(req.headers.authorization || ''));
+  if (!m) return null;
+  try {
+    const r = await fetch(`${PB_URL}/api/collections/users/auth-refresh`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${m[1]}` },
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data?.record || null;
+  } catch {
+    return null;
+  }
+}
+
+app.use(async (req, res, next) => {
+  if (!req.path.startsWith('/ds-api/')) return next();
+  if (DS_OPEN.has(req.path)) return next();
+  const user = await userFromReq(req);
+  if (!user) return res.status(401).json({ ok: false, error: '先登录再操作', need_login: true });
+  req.user = user;
+  return next();
+});
+
 const SCHEMA_HINT = `{
   "title": "任务标题，去掉「截止/用时/材料」等标签词",
   "kind": "short 或 long",

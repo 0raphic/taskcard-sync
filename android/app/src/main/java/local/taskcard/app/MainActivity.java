@@ -83,10 +83,15 @@ public class MainActivity extends AppCompatActivity {
                         if (u.isEmpty()) u = Api.base(this);
                         if (!u.startsWith("http")) u = "http://" + u;
                         Api.setBase(this, u);
+                        if (Api.token(this).isEmpty()) promptLogin();
                         board.load();
                     })
                     .setCancelable(false)
                     .show();
+        }
+
+        if (!Api.prefs(this).getString("base", "").isEmpty() && Api.token(this).isEmpty()) {
+            promptLogin();
         }
 
         Reminders.scheduleAll(this);
@@ -113,6 +118,70 @@ public class MainActivity extends AppCompatActivity {
             else show(settings);
             return true;
         });
+    }
+
+    /** 登录：账号存在 PocketBase 的 users 集合里 */
+    public void promptLogin() {
+        LinearLayout box = Ui.column(this);
+        int pad = Ui.dp(this, 20);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(Ui.label(this, "用电脑上设置页里那个账号登录。纸卡扫码不用登录。"));
+        android.widget.EditText email = Ui.input(this, "邮箱", "",
+                android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        android.widget.EditText pass = Ui.input(this, "密码", "",
+                android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        box.addView(email, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        box.addView(pass, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder b =
+                new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                        .setTitle("登录")
+                        .setView(box)
+                        .setCancelable(false);
+        b.setPositiveButton("登录", null);
+        androidx.appcompat.app.AlertDialog dialog = b.create();
+        dialog.setOnShowListener(d -> dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String e = email.getText().toString().trim();
+                    String pw = pass.getText().toString();
+                    if (e.isEmpty() || pw.isEmpty()) {
+                        Ui.toast(this, "邮箱和密码都要填");
+                        return;
+                    }
+                    try {
+                        org.json.JSONObject body = new org.json.JSONObject();
+                        body.put("identity", e);
+                        body.put("password", pw);
+                        Api.post(this, "/api/collections/users/auth-with-password", body, new Api.Cb() {
+                            @Override
+                            public void ok(String resp) {
+                                try {
+                                    String t = new org.json.JSONObject(resp).optString("token", "");
+                                    if (t.isEmpty()) {
+                                        Ui.toast(MainActivity.this, "登录没拿到 token");
+                                        return;
+                                    }
+                                    Api.setToken(MainActivity.this, t);
+                                    dialog.dismiss();
+                                    Ui.toast(MainActivity.this, "登录好了");
+                                    if (board != null) board.load();
+                                } catch (Exception ex) {
+                                    Ui.toast(MainActivity.this, "登录响应看不懂");
+                                }
+                            }
+
+                            @Override
+                            public void fail(Exception ex) {
+                                Ui.toast(MainActivity.this, "登录失败：" + ex.getMessage());
+                            }
+                        });
+                    } catch (Exception ex) {
+                        Ui.toast(this, "登录请求出错");
+                    }
+                }));
+        dialog.show();
     }
 
     private void show(Fragment f) {

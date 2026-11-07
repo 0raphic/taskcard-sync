@@ -28,6 +28,10 @@ public final class Api {
     public static class NeedPasscode extends IOException {
     }
 
+    /** 没登录 / token 过期：界面要弹登录框 */
+    public static class NeedLogin extends IOException {
+    }
+
     private Api() {
     }
 
@@ -85,7 +89,10 @@ public final class Api {
                     conn.setRequestProperty("Content-Type", "application/json");
                 }
                 String t = token(app);
-                if (t != null && !t.isEmpty()) conn.setRequestProperty("x-write-token", t);
+                if (t != null && !t.isEmpty()) {
+                    conn.setRequestProperty("authorization", "Bearer " + t);
+                    conn.setRequestProperty("x-write-token", t);
+                }
                 if (body != null) {
                     try (OutputStream os = conn.getOutputStream()) {
                         os.write(body.toString().getBytes(StandardCharsets.UTF_8));
@@ -95,6 +102,7 @@ public final class Api {
                 InputStream is = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
                 String resp = read(is);
                 if (code >= 400) {
+                    if (code == 401 && resp.contains("need_login")) throw new NeedLogin();
                     if (code == 401 && resp.contains("need_passcode")) throw new NeedPasscode();
                     throw new IOException("HTTP " + code + ": " + trim(resp));
                 }

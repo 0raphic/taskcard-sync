@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, usePathname } from '../lib/router';
+import { logout, useAuth } from '../lib/auth';
 import { THEME_CYCLE, THEME_LABEL, useTheme } from '../lib/theme';
 
 const NAV = [
@@ -16,6 +17,7 @@ const THEME_GLYPH: Record<string, string> = { system: '◐', light: '☀', dark:
 
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
+  const { user } = useAuth();
   const [mode, setMode] = useTheme();
   const nextMode = THEME_CYCLE[(THEME_CYCLE.indexOf(mode) + 1) % THEME_CYCLE.length];
 
@@ -60,6 +62,19 @@ export function Shell({ children }: { children: ReactNode }) {
             >
               {THEME_GLYPH[mode]}
             </button>
+            {user && (
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  window.location.reload();
+                }}
+                title={`${user.email} · 退出登录`}
+                className="ml-2 hidden shrink-0 max-w-[150px] truncate border border-ink/20 px-2 py-1 text-[11px] text-oncanvas/55 hover:border-ink hover:text-oncanvas sm:block"
+              >
+                {user.name || user.email.split('@')[0]}
+              </button>
+            )}
           </nav>
         </div>
       </header>

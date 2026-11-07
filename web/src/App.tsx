@@ -1,10 +1,12 @@
 import { PasscodeGate } from './components/PasscodeGate';
+import { useAuth } from './lib/auth';
 import { Shell } from './components/Shell';
 import { usePathname } from './lib/router';
 import { Board } from './pages/Board';
 import { Capture } from './pages/Capture';
 import { Detail } from './pages/Detail';
 import { Landing } from './pages/Landing';
+import { Login } from './pages/Login';
 import { Print } from './pages/Print';
 import { Cards } from './pages/Cards';
 import { Settings } from './pages/Settings';
@@ -13,6 +15,7 @@ import { TaskList } from './pages/TaskList';
 
 export function App() {
   const path = usePathname();
+  const { user } = useAuth();
 
   // 扫码落地页不套外壳：手机上要像一张卡，而不是一个后台
   const landing = /^\/t\/([^/]+)\/?$/.exec(path);
@@ -24,6 +27,8 @@ export function App() {
       </>
     );
   }
+
+  if (!user) return <Login />;
 
   const detail = /^\/tasks\/([^/]+)\/?$/.exec(path);
   let page = <Board />;
