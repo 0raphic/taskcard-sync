@@ -6,6 +6,7 @@ const NAV = [
   { to: '/', label: '看板', en: 'BOARD' },
   { to: '/tasks', label: '任务', en: 'TASKS' },
   { to: '/cards', label: '卡片', en: 'CARDS' },
+  { to: '/stats', label: '统计', en: 'STATS' },
   { to: '/capture', label: '录入', en: 'CAPTURE' },
   { to: '/print', label: '打印', en: 'PRINT' },
   { to: '/settings', label: '设置', en: 'SETUP' },

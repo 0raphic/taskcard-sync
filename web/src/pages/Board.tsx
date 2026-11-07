@@ -240,6 +240,12 @@ export function Board() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {COLUMNS.map((col) => {
             const items = shown.filter(col.match);
+            const sorted =
+              col.key === 'done'
+                ? items.slice().sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || ''))
+                : items;
+            const itemsShown = col.key === 'done' ? sorted.slice(0, 8) : sorted;
+            const hidden = sorted.length - itemsShown.length;
             const isOver = overCol === col.key;
             return (
               <section
@@ -274,7 +280,7 @@ export function Board() {
                 </div>
 
                 <div className="flex flex-col gap-3">
-                  {items.map((t) => (
+                  {itemsShown.map((t) => (
                     <div
                       key={t.id}
                       onTouchStart={(e) => startHold(t, e)}
@@ -302,6 +308,11 @@ export function Board() {
                       <TaskCard task={t} />
                     </div>
                   ))}
+                  {hidden > 0 && (
+                    <Link to="/tasks" className="text-[11px] text-oncanvas/35 underline-offset-4 hover:text-oncanvas/70 hover:underline">
+                      还有 {hidden} 张 · 去全部任务看 →
+                    </Link>
+                  )}
                   {items.length === 0 && (
                     <p className="border border-dashed border-line/20 px-3 py-8 text-center text-[11px] text-oncanvas/25">
                       把卡拖到这里

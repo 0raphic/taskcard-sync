@@ -118,6 +118,7 @@ const tasksCol = await ensureCollection('tasks', [
   { name: 'checklist', type: 'json', maxSize: 20000 },
   { name: 'remind_at', type: 'text', max: 40 },
   { name: 'repeat', type: 'text', max: 20 },
+  { name: 'completed_at', type: 'text', max: 40 },
   { name: 'client_updated_at', type: 'text', max: 40 },
   { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
   { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },

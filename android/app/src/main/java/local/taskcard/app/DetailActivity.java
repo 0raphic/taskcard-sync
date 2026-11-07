@@ -250,6 +250,7 @@ public class DetailActivity extends AppCompatActivity {
         String wk = weekly.getText().toString().trim();
         b.put("weekly_hours", wk.isEmpty() ? 0 : Integer.parseInt(wk));
         b.put("repeat", repeatValue);
+        if (!"done".equals(b.optString("status"))) b.put("completed_at", "");
         for (int i = 0; i < statusGroup.getChildCount(); i++) {
             Chip c = (Chip) statusGroup.getChildAt(i);
             if (c.isChecked()) b.put("status", String.valueOf(c.getTag()));

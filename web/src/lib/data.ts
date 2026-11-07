@@ -161,6 +161,7 @@ export function useUpdateTask() {
   return useCallback(async (id: string, patch: Partial<Task>) => {
     const record = await pb.collection('tasks').update<Task>(id, {
       ...patch,
+      ...(patch.status && patch.status !== 'done' ? { completed_at: '' } : {}),
       client_updated_at: new Date().toISOString(),
     });
     return record;

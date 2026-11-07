@@ -300,6 +300,7 @@ public class BoardFragment extends Fragment {
             }
             JSONObject body = new JSONObject();
             body.put("status", status);
+            if (!"done".equals(status)) body.put("completed_at", "");
             Api.patch(requireContext(), "/api/collections/tasks/records/" + t.id, body, new Api.Cb() {
                 @Override
                 public void ok(String b) {

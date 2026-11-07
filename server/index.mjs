@@ -688,7 +688,7 @@ app.post('/ds-api/tasks/:id/done', async (req, res) => {
     const task = got.json;
     const patched = await pbReq('/api/collections/tasks/records/' + encodeURIComponent(id), {
       method: 'PATCH',
-      body: { status: 'done', client_updated_at: new Date().toISOString() },
+      body: { status: 'done', completed_at: new Date().toISOString(), client_updated_at: new Date().toISOString() },
     });
     if (!patched.ok) return res.status(400).json({ ok: false, error: '标记完成失败' });
 

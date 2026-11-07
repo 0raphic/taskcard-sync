@@ -8,6 +8,7 @@ import { Landing } from './pages/Landing';
 import { Print } from './pages/Print';
 import { Cards } from './pages/Cards';
 import { Settings } from './pages/Settings';
+import { Stats } from './pages/Stats';
 import { TaskList } from './pages/TaskList';
 
 export function App() {
@@ -32,6 +33,7 @@ export function App() {
   else if (path.startsWith('/print')) page = <Print />;
   else if (path.startsWith('/cards')) page = <Cards />;
   else if (path.startsWith('/settings')) page = <Settings />;
+  else if (path.startsWith('/stats')) page = <Stats />;
   else if (path !== '/' && path !== '') page = <NotFound path={path} />;
 
   return (

@@ -45,6 +45,7 @@ export type Task = {
   tags?: string;
   remind_at?: string;
   repeat?: string;
+  completed_at?: string;
   checklist?: ChecklistItem[];
   draft?: boolean;
   client_updated_at?: string;
