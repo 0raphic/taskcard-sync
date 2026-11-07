@@ -113,6 +113,7 @@ const tasksCol = await ensureCollection('tasks', [
   { name: 'start', type: 'text', max: 20 },
   { name: 'milestones', type: 'json', maxSize: 20000 },
   { name: 'progress', type: 'number', min: 0, max: 100 },
+  { name: 'draft', type: 'bool' },
   { name: 'client_updated_at', type: 'text', max: 40 },
   { name: 'created', type: 'autodate', onCreate: true, onUpdate: false },
   { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },

@@ -151,7 +151,8 @@ def draw_short(c, x, y, t, url):
 
     body = y + CARD_H - pad - 22 * mm
     field(c, x + pad, body, tw * 0.55, "截止", t.get("due", "—"), 8)
-    field(c, x + pad + tw * 0.6, body, tw * 0.35, "用时", f'{t.get("estimate_min", "?")} 分', 8)
+    est = t.get("estimate_min")
+    field(c, x + pad + tw * 0.6, body, tw * 0.35, "用时", f"{est} 分" if est else "____ 分", 8)
 
     body -= 7 * mm
     text(c, "描述", x + pad, body, 6.3, color=SOFT)

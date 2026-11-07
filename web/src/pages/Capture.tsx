@@ -52,6 +52,7 @@ export function Capture() {
   const fileRef = useRef<HTMLInputElement>(null);
   const fileRef2 = useRef<HTMLInputElement>(null);
   const [shotOpen, setShotOpen] = useState(false);
+  const [scanned, setScanned] = useState<{ code: string; id: string; title: string } | null>(null);
   const inPageCam = canUseInPageCamera();
 
   async function structure() {
@@ -85,9 +86,33 @@ export function Capture() {
     setBusy(true);
     setFlash('照片处理中…');
     setRaw(null);
+    setScanned(null);
     try {
       const dataUrl = await fileToJpegDataUrl(file);
-      setFlash('识别中…');
+
+      // 第一步永远是扫二维码：它决定这是「哪一张卡」，而不是一张新卡
+      setFlash('先扫右上角的二维码…');
+      const scanRes = await fetch('/ds-api/scan', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      const scanBody = (await scanRes.json().catch(() => ({}))) as {
+        ok?: boolean;
+        code?: string;
+        card?: { id: string; title: string; draft?: boolean };
+        fields?: Partial<Draft>;
+        error?: string;
+      };
+      if (scanRes.ok && scanBody.ok && scanBody.card && scanBody.code) {
+        setDraft({ ...normalize(scanBody.fields), status: 'todo' });
+        setScanned({ code: scanBody.code, id: scanBody.card.id, title: scanBody.card.title });
+        setFlash(`认出卡片：短码 ${scanBody.code}，核对卡面上的字，保存就写回这张卡`);
+        return;
+      }
+
+      // 扫不到码（没拍全 / 不是我们的卡）时退回「当新卡识别」，别让用户卡住
+      setFlash(`没认出卡片：${scanBody.error || `HTTP ${scanRes.status}`}，按新卡识别…`);
       const res = await fetch('/ds-api/ocr', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -123,16 +148,33 @@ export function Capture() {
     setBusy(true);
     setFlash(null);
     try {
-      const task = await createTask({
+      const payload = {
         title: draft.title.trim(),
         kind: draft.kind,
         status: draft.status,
-        due: draft.due || undefined,
+        due: draft.due || '',
         estimate_min: draft.estimate_min === '' ? 0 : Number(draft.estimate_min),
-        description: draft.description || undefined,
-        materials: draft.materials || undefined,
-        notes: draft.notes || undefined,
-        goal: draft.goal || undefined,
+        description: draft.description || '',
+        materials: draft.materials || '',
+        notes: draft.notes || '',
+        goal: draft.goal || '',
+      };
+
+      if (scanned) {
+        // 扫到的卡：把卡面内容写回这条记录，并把它从「空白卡」变成真实任务
+        await pb.collection('tasks').update(scanned.id, { ...payload, draft: false });
+        setFlash(`已写回短码 ${scanned.code} 的那张卡`);
+        navigate(`/tasks/${scanned.id}`);
+        return;
+      }
+
+      const task = await createTask({
+        ...payload,
+        due: payload.due || undefined,
+        description: payload.description || undefined,
+        materials: payload.materials || undefined,
+        notes: payload.notes || undefined,
+        goal: payload.goal || undefined,
       });
 
       const code = shortCode();
@@ -235,11 +277,24 @@ export function Capture() {
 
       {draft && (
         <section className="flex flex-col gap-3 border-t border-white/10 pt-5">
+          {scanned && (
+            <div className="flex flex-wrap items-center gap-2 border border-moss/40 bg-moss/10 px-3 py-2 text-[12px] text-paper/80">
+              <span className="text-moss">认出卡片</span>
+              <span className="font-mono text-paper">{scanned.code}</span>
+              <span className="text-paper/45">·</span>
+              <span>{scanned.title}</span>
+              <span className="ml-auto text-[11px] text-paper/45">保存会把内容写回这张卡</span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <h2 className="text-[11px] tracking-[0.18em] text-paper/45">核对</h2>
             <button
               type="button"
-              onClick={() => setDraft(null)}
+              onClick={() => {
+                setDraft(null);
+                setScanned(null);
+              }}
               className="text-[11px] text-paper/35 hover:text-paper/60"
             >
               清空
@@ -332,7 +387,7 @@ export function Capture() {
             disabled={busy}
             className="mt-1 self-start bg-seal px-5 py-2.5 text-[13px] font-medium text-paper hover:bg-seal/90 disabled:opacity-50"
           >
-            保存并生成短码
+            {scanned ? '保存并写回这张卡' : '保存并生成短码'}
           </button>
         </section>
       )}

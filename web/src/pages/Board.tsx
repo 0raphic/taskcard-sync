@@ -8,7 +8,8 @@ const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 
 export function Board() {
   const { tasks, error } = useTasks();
-  const list = tasks ?? [];
+  // 空白卡是占位记录，内容还没写，不上看板
+  const list = (tasks ?? []).filter((t) => !t.draft);
 
   const overdue = list.filter((t) => isOverdue(t));
   const today = list.filter((t) => isToday(t) && !isOverdue(t));

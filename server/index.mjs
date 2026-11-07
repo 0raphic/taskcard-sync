@@ -174,7 +174,7 @@ function localParse(text) {
   };
 }
 
-async function callDeepSeek(messages, { key, model } = {}) {
+async function callDeepSeek(messages, { key, model, maxTokens = 800 } = {}) {
   if (!key) {
     const err = new Error('服务端没有配置 DeepSeek Key（网页「设置」里填一次，或 .env.local）');
     err.status = 503;
@@ -191,7 +191,7 @@ async function callDeepSeek(messages, { key, model } = {}) {
       messages,
       temperature: 0.2,
       response_format: { type: 'json_object' },
-      max_tokens: 800,
+      max_tokens: maxTokens,
     }),
   });
   const body = await res.json().catch(() => ({}));
@@ -213,6 +213,12 @@ async function callDeepSeek(messages, { key, model } = {}) {
     throw err;
   }
 }
+
+
+const SCAN_SYSTEM = `你在看一张手写任务卡的照片。先不要猜卡片编号（编号由二维码决定），只读卡面上写的字。
+只输出一个 JSON 对象，不要 Markdown 代码块，不要解释。字段：
+{"title": 任务名称原文, "due": "MM-DD 或空", "estimate_min": 数字分钟或 0, "description": 描述原文, "materials": 材料原文, "notes": 备注原文, "start": "MM-DD 或空", "goal": 目标原文, "progress": 0-100 的数字或 0}
+读不出来、照片上没写的字段，留空字符串或 0，不要编造。`;
 
 app.post('/ds-api/structure', async (req, res) => {
   const text = String(req.body?.text ?? '').trim();
@@ -417,68 +423,11 @@ app.delete('/ds-api/tasks/:id', async (req, res) => {
   }
 });
 
-// 勾选任务 → 生成 1/8 A4 卡片 PDF（复用 scripts/gen_cards.py 的排版）
-app.post('/ds-api/cards.pdf', async (req, res) => {
-  const body = req.body || {};
-  const ids = Array.isArray(body.ids)
-    ? [...new Set(body.ids.filter((v) => typeof v === 'string' && v.trim()))]
-    : [];
-  if (!ids.length) return res.status(400).json({ ok: false, error: '先选至少一张卡' });
-  if (ids.length > 200) return res.status(400).json({ ok: false, error: '一次最多 200 张，分批打' });
 
-  const baseUrl = String(body.base_url || `http://${lanIp()}:${PORT}`).replace(/\/+$/, '');
-  if (!/^https?:\/\/[^/\s]+$/.test(baseUrl)) {
-    return res.status(400).json({ ok: false, error: '地址要像 http://192.168.0.108:8088' });
-  }
-
+// 生成卡片 PDF（把 payload 交给 python 排版），返回 { buffer } 或 { status, error }
+async function renderCards(payload, { doubleSided = false } = {}) {
   const tmp = mkdtempSync(path.join(os.tmpdir(), 'taskcard-cards-'));
   try {
-    // 1) 按传入顺序取任务
-    const filter = ids.map((id) => `id="${id}"`).join('||');
-    const q = await pbReq(
-      `/api/collections/tasks/records?perPage=200&filter=${encodeURIComponent(filter)}`,
-    );
-    const found = new Map((q.json?.items || []).map((t) => [t.id, t]));
-    const tasks = ids.map((id) => found.get(id)).filter(Boolean);
-    if (!tasks.length) return res.status(404).json({ ok: false, error: '这些卡都不在了' });
-
-    // 2) 短码：没有的就补一个，保证纸上二维码能扫
-    const lf = tasks.map((t) => `task="${t.id}"`).join('||');
-    const lq = await pbReq(
-      `/api/collections/short_links/records?perPage=200&filter=${encodeURIComponent(lf)}`,
-    );
-    const codes = new Map((lq.json?.items || []).map((l) => [l.task, l.code]));
-    for (const t of tasks) {
-      if (codes.has(t.id)) continue;
-      const code = await uniqueCode();
-      const r = await pbReq('/api/collections/short_links/records', {
-        method: 'POST',
-        body: { code, task: t.id, active: true, scans: 0 },
-      });
-      if (r.ok) codes.set(t.id, code);
-    }
-
-    const payload = {
-      base_url: baseUrl,
-      tasks: tasks.map((t) => ({
-        id: t.id,
-        code: codes.get(t.id),
-        kind: t.kind,
-        title: t.title,
-        due: t.due || '',
-        estimate_min: t.estimate_min ?? 0,
-        description: t.description || '',
-        materials: t.materials || '',
-        notes: t.notes || '',
-        start: t.start || '',
-        goal: t.goal || '',
-        milestones: Array.isArray(t.milestones) ? t.milestones : [],
-        resources: t.materials || '',
-        progress: t.progress ?? 0,
-      })),
-    };
-
-    // 3) 交给 Python 排版
     const outPdf = path.join(tmp, 'cards.pdf');
     const args = [
       path.join(ROOT, 'scripts', 'gen_cards.py'),
@@ -487,11 +436,11 @@ app.post('/ds-api/cards.pdf', async (req, res) => {
       '--output',
       outPdf,
       '--base-url',
-      baseUrl,
+      payload.base_url,
       '--codes-out',
       '',
     ];
-    if (body.double_sided) args.push('--double-sided');
+    if (doubleSided) args.push('--double-sided');
 
     const result = await new Promise((resolve) => {
       const child = spawn(PYTHON, args, { cwd: ROOT, windowsHide: true });
@@ -506,35 +455,295 @@ app.post('/ds-api/cards.pdf', async (req, res) => {
       child.stdin.end(JSON.stringify(payload));
     });
 
-    if (!result.ok) {
-      if (result.code === 'ENOENT') {
-        return res.status(501).json({
-          ok: false,
-          error: '这台机器没找到 python；装 Python 后跑 pip install reportlab qrcode',
-        });
-      }
-      const tail = String(result.err || '')
-        .trim()
-        .split('\n')
-        .slice(-3)
-        .join(' ');
-      return res.status(502).json({ ok: false, error: `生成失败：${tail}` });
+    if (result.ok) return { buffer: readFileSync(outPdf) };
+    if (result.code === 'ENOENT') {
+      return { status: 501, error: '这台机器没找到 python；装 Python 后跑 pip install reportlab qrcode' };
     }
-
-    const pdf = readFileSync(outPdf);
-    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
-    res.setHeader('content-type', 'application/pdf');
-    res.setHeader('content-disposition', `inline; filename="taskcard-${stamp}.pdf"`);
-    res.setHeader('x-card-count', String(payload.tasks.length));
-    res.send(pdf);
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
+    const tail = String(result.err || '').trim().split(/\r?\n/).slice(-3).join(' ');
+    return { status: 502, error: `生成失败：${tail}` };
   } finally {
     try {
       rmSync(tmp, { recursive: true, force: true });
     } catch {
       // 临时目录清不掉不影响返回
     }
+  }
+}
+
+function pdfName(prefix = 'taskcard') {
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+  return `${prefix}-${stamp}.pdf`;
+}
+
+// 从二维码内容里取出 6 位短码（码里一般是 http://<ip>:8088/t/<code>）
+function codeFromQr(text) {
+  const raw = String(text || '').trim();
+  const m = raw.match(/\/t\/([A-Za-z0-9]{4,12})\/?$/);
+  if (m) return m[1];
+  if (/^[A-Za-z0-9]{4,12}$/.test(raw)) return raw;
+  return '';
+}
+
+async function ensureCodes(tasks) {
+  const lf = tasks.map((t) => `task="${t.id}"`).join('||');
+  const lq = await pbReq(`/api/collections/short_links/records?perPage=200&filter=${encodeURIComponent(lf)}`);
+  const codes = new Map((lq.json?.items || []).map((l) => [l.task, l.code]));
+  for (const t of tasks) {
+    if (codes.has(t.id)) continue;
+    const code = await uniqueCode();
+    const r = await pbReq('/api/collections/short_links/records', {
+      method: 'POST',
+      body: { code, task: t.id, active: true, scans: 0 },
+    });
+    if (r.ok) codes.set(t.id, code);
+  }
+  return codes;
+}
+
+function cardsPayload(tasks, codes, baseUrl, { blank = false } = {}) {
+  return {
+    base_url: baseUrl,
+    tasks: tasks.map((t) => ({
+      id: t.id,
+      code: codes.get(t.id),
+      kind: t.kind,
+      title: blank ? '' : t.title,
+      due: blank ? '' : t.due || '',
+      estimate_min: blank ? 0 : t.estimate_min ?? 0,
+      description: blank ? '' : t.description || '',
+      materials: blank ? '' : t.materials || '',
+      notes: blank ? '' : t.notes || '',
+      start: blank ? '' : t.start || '',
+      goal: blank ? '' : t.goal || '',
+      milestones: blank ? [] : Array.isArray(t.milestones) ? t.milestones : [],
+      resources: blank ? '' : t.materials || '',
+      progress: blank ? 0 : t.progress ?? 0,
+    })),
+  };
+}
+
+// 勾选任务 → 生成 1/8 A4 卡片 PDF（复用 scripts/gen_cards.py 的排版）
+function baseUrlOf(input) {
+  const value = String(input || `http://${lanIp()}:${PORT}`).replace(/\/+$/, '');
+  return /^https?:\/\/[^/\s]+$/.test(value) ? value : '';
+}
+
+function callPythonJson(script, payload, timeoutMs = 30000) {
+  return new Promise((resolve) => {
+    const child = spawn(PYTHON, [path.join(ROOT, 'scripts', script)], { cwd: ROOT, windowsHide: true });
+    let out = '';
+    let err = '';
+    const timer = setTimeout(() => {
+      child.kill();
+      resolve({ ok: false, error: `脚本超时（${script}）` });
+    }, timeoutMs);
+    child.stdout.on('data', (d) => {
+      out += String(d);
+      if (out.length > 200000) out = out.slice(-200000);
+    });
+    child.stderr.on('data', (d) => {
+      err += String(d);
+      if (err.length > 4000) err = err.slice(-4000);
+    });
+    child.on('error', (e) => {
+      clearTimeout(timer);
+      resolve({ ok: false, error: e.code === 'ENOENT' ? '这台机器没找到 python' : e.message });
+    });
+    child.on('close', () => {
+      clearTimeout(timer);
+      try {
+        resolve(JSON.parse(out.trim().split('\n').pop() || '{}'));
+      } catch {
+        resolve({ ok: false, error: `脚本没有返回 JSON：${err.trim().slice(-200) || out.slice(-200)}` });
+      }
+    });
+    child.stdin.end(JSON.stringify(payload));
+  });
+}
+
+// 勾选任务 → 生成 1/8 A4 卡片 PDF（复用 scripts/gen_cards.py 的排版）
+app.post('/ds-api/cards.pdf', async (req, res) => {
+  const body = req.body || {};
+  const ids = Array.isArray(body.ids)
+    ? [...new Set(body.ids.filter((v) => typeof v === 'string' && v.trim()))]
+    : [];
+  if (!ids.length) return res.status(400).json({ ok: false, error: '先选至少一张卡' });
+  if (ids.length > 200) return res.status(400).json({ ok: false, error: '一次最多 200 张，分批打' });
+
+  const baseUrl = baseUrlOf(body.base_url);
+  if (!baseUrl) return res.status(400).json({ ok: false, error: '地址要像 http://192.168.0.108:8088' });
+
+  try {
+    const filter = ids.map((id) => `id="${id}"`).join('||');
+    const q = await pbReq(
+      `/api/collections/tasks/records?perPage=200&filter=${encodeURIComponent(filter)}`,
+    );
+    const found = new Map((q.json?.items || []).map((t) => [t.id, t]));
+    const tasks = ids.map((id) => found.get(id)).filter(Boolean);
+    if (!tasks.length) return res.status(404).json({ ok: false, error: '这些卡都不在了' });
+
+    const codes = await ensureCodes(tasks);
+    const payload = cardsPayload(tasks, codes, baseUrl);
+    const out = await renderCards(payload, { doubleSided: !!body.double_sided });
+    if (!out.buffer) return res.status(out.status || 500).json({ ok: false, error: out.error });
+
+    res.setHeader('content-type', 'application/pdf');
+    res.setHeader('content-disposition', `inline; filename="${pdfName()}"`);
+    res.setHeader('x-card-count', String(payload.tasks.length));
+    res.send(out.buffer);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// 打印空白表：先建 N 张占位卡（draft，不在看板出现）+ 短码，再出空白版式 PDF
+app.post('/ds-api/cards.blank', async (req, res) => {
+  const body = req.body || {};
+  const count = Math.min(64, Math.max(1, Number(body.count) || 8));
+  const kind = body.kind === 'long' ? 'long' : 'short';
+  const baseUrl = baseUrlOf(body.base_url);
+  if (!baseUrl) return res.status(400).json({ ok: false, error: '地址要像 http://192.168.0.108:8088' });
+
+  try {
+    const created = [];
+    for (let i = 0; i < count; i += 1) {
+      const r = await pbReq('/api/collections/tasks/records', {
+        method: 'POST',
+        body: {
+          title: `空白卡 ${String(i + 1).padStart(2, '0')}`,
+          kind,
+          status: 'todo',
+          draft: true,
+          milestones: [],
+        },
+      });
+      if (!r.ok) {
+        return res.status(500).json({
+          ok: false,
+          error: `建空白卡失败：${r.json?.message || `http ${r.status}`}`,
+        });
+      }
+      created.push(r.json);
+    }
+
+    const codes = await ensureCodes(created);
+    const payload = cardsPayload(created, codes, baseUrl, { blank: true });
+    const out = await renderCards(payload, { doubleSided: !!body.double_sided });
+    if (!out.buffer) return res.status(out.status || 500).json({ ok: false, error: out.error });
+
+    res.setHeader('content-type', 'application/pdf');
+    res.setHeader('content-disposition', `inline; filename="${pdfName('blank-cards')}"`);
+    res.setHeader('x-card-count', String(payload.tasks.length));
+    res.send(out.buffer);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+
+// 读卡面：稳定起见给两次机会（视觉模型偶尔把 token 全花在推理上，content 会是空的）
+async function readCardFields(image, code, cfg) {
+  const build = (strict) => [
+    {
+      role: 'system',
+      content: strict ? `${SCAN_SYSTEM}
+这次不要写任何分析过程，第一个字符就是 {。` : SCAN_SYSTEM,
+    },
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: `这是卡片 ${code} 的照片，请读卡面内容。` },
+        { type: 'image_url', image_url: { url: image } },
+      ],
+    },
+  ];
+  let last;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await callDeepSeek(build(attempt > 0), { key: cfg.key, model: cfg.vision, maxTokens: 3000 });
+    } catch (e) {
+      last = e;
+      if (e.status !== 502) throw e;
+    }
+  }
+  const err = new Error('这次没读出卡面内容（可能字太潦草或照片太暗），再拍一张试试。');
+  err.status = 502;
+  throw err;
+}
+
+// 拍照识卡：先解二维码拿卡片编号，再让模型读卡面上的手写内容
+app.post('/ds-api/scan', async (req, res) => {
+  const image = String(req.body?.image ?? '');
+  if (!image.startsWith('data:image/')) {
+    return res.status(400).json({ ok: false, error: '需要 data:image/... 的图片' });
+  }
+  const cfg = await llmConfig();
+  if (!cfg.vision || !cfg.key) {
+    return res.status(501).json({
+      ok: false,
+      error: '照片识别还没接上：在网页「设置」里填 DeepSeek Key 和看图模型（deepseek-flash）即可。',
+    });
+  }
+
+  try {
+    // 1) 先把卡片编号读出来
+    const qr = await callPythonJson('decode_qr.py', { image }, 20000);
+    if (!qr.ok) return res.status(502).json({ ok: false, error: `扫码失败：${qr.error}` });
+    const codes = Array.isArray(qr.codes) ? qr.codes : [];
+    if (!codes.length) {
+      return res.status(422).json({
+        ok: false,
+        error: '照片里没找到二维码。把整张卡拍全（右上角二维码要清楚），别只拍文字。',
+      });
+    }
+    const code = codes.map(codeFromQr).find(Boolean);
+    if (!code) {
+      return res.status(422).json({ ok: false, error: '扫到的不是这张卡片的二维码（内容不是 /t/<短码>）' });
+    }
+
+    // 2) 码 → 卡片
+    const lq = await pbReq(
+      `/api/collections/short_links/records?perPage=1&filter=${encodeURIComponent(`code="${code}"`)}&expand=task`,
+    );
+    const link = lq.json?.items?.[0];
+    if (!link) {
+      return res.status(404).json({
+        ok: false,
+        error: `短码 ${code} 不在系统里：这张卡可能被删了，或者还没导入。`,
+        code,
+      });
+    }
+    let task = link.expand?.task;
+    if (!task) {
+      const tq = await pbReq(`/api/collections/tasks/records/${link.task}`);
+      task = tq.json;
+    }
+    if (!task) return res.status(404).json({ ok: false, error: '这张卡的任务记录不在了', code });
+
+    // 3) 再读卡面上的内容
+    const fields = await readCardFields(image, code, cfg);
+
+    await pbReq(`/api/collections/short_links/records/${link.id}`, {
+      method: 'PATCH',
+      body: { scans: (link.scans || 0) + 1 },
+    });
+
+    res.json({
+      ok: true,
+      code,
+      card: {
+        id: task.id,
+        title: task.title,
+        kind: task.kind,
+        status: task.status,
+        draft: Boolean(task.draft),
+      },
+      fields,
+    });
+  } catch (e) {
+    res.status(e.status || 500).json({ ok: false, error: e.message });
+  } finally {
+    // 图片只在内存里过一遍，不落盘
   }
 });
 

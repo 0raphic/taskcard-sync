@@ -18,7 +18,7 @@ export function TaskList() {
   const [q, setQ] = useState('');
 
   const shown = useMemo(() => {
-    const list = tasks ?? [];
+    const list = (tasks ?? []).filter((t) => !t.draft);
     const needle = q.trim().toLowerCase();
     return list
       .filter((t) => {
@@ -42,7 +42,7 @@ export function TaskList() {
         <div>
           <p className="font-mono text-[11px] tracking-[0.18em] text-paper/40">全部任务</p>
           <h1 className="mt-1 text-[24px] font-semibold tracking-tight">
-            {tasks ? `${shown.length} / ${tasks.length} 张` : '读取中…'}
+            {tasks ? `${shown.length} / ${(tasks ?? []).filter((t) => !t.draft).length} 张` : '读取中…'}
           </h1>
         </div>
         <input
