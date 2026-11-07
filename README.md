@@ -146,9 +146,24 @@ tools/              下载 / 启动 PocketBase、CDP 截图、Android SDK 与 AP
 重新打包（改了网页不用重打，改了 App 外壳才要）：
 
 ```bash
-node tools/install-android.mjs   # 第一次：装 Android SDK 到 D:\Android\Sdk
-node tools/build-apk.mjs         # 输出 dist/taskcard.apk
+# 第一次：装 Android SDK + Gradle（默认装到 D:/Application/AI/Android/Sdk 与 D:/Application/AI/gradle）
+node tools/install-android.mjs
+node tools/build-apk.mjs            # 输出 dist/taskcard.apk（调试签名）
+node tools/build-apk.mjs --release  # 输出 dist/taskcard-<版本>-release.apk（正式签名）
 ```
+
+工具链位置可以用环境变量覆盖：`ANDROID_SDK_ROOT`、`GRADLE_BIN`、`GRADLE_USER_HOME`、`JAVA_HOME`；
+不设时默认用 `D:/Application/AI/...`（本机约定：自动安装的软件统一放这里，不散落在 C 盘或 D 盘根目录）。
+
+正式签名用 `android/taskcard-release.jks`（口令 `taskcard123`，alias `taskcard`，已加入 `.gitignore`）。
+换机器时重新生成：
+
+```bash
+keytool -genkeypair -keystore android/taskcard-release.jks -alias taskcard \
+  -keyalg RSA -keysize 2048 -validity 9125 -storepass taskcard123 -keypass taskcard123 \
+  -dname "CN=TaskCard, O=TaskCard, C=CN"
+```
+
 
 ## 配置（Key 存在数据库里）
 
