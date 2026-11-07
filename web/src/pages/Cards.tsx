@@ -127,7 +127,7 @@ export function Cards() {
     }
     const url = URL.createObjectURL(await res.blob());
     const win = window.open(url, '_blank');
-    if (!win) setFlash('浏览器拦了弹窗，允许后重试，或到「打印」页重新生成');
+    if (!win) setFlash('浏览器拦截了弹窗。允许后会自动打开，或到「打印」页重新生成。');
     return url;
   }
 
@@ -228,8 +228,8 @@ export function Cards() {
           <p className="font-mono text-[11px] tracking-[0.18em] text-oncanvas/40">卡片</p>
           <h1 className="mt-1 text-[24px] font-semibold tracking-tight">这一叠纸都去哪了</h1>
           <p className="mt-1 max-w-[560px] text-[12px] leading-relaxed text-oncanvas/45">
-            每张空白卡都是一条记录：没用过的、正在写的、做完的、作废的，都在这儿。
-            丢了的补印一张（短码不变），不想再用的就作废。
+            每张空白卡都是一条记录：未使用、使用中、已完成、已作废。
+            丢了就补印一张（短码不变），不想用了就作废。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -272,7 +272,7 @@ export function Cards() {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-[11px] text-oncanvas/30">短码是纸卡的身份证，别改它</span>
+          <span className="text-[11px] text-oncanvas/30">短码是纸卡的身份，请勿修改</span>
         </div>
       </div>
 
@@ -345,7 +345,7 @@ export function Cards() {
 
       {rows && shown.length === 0 && (
         <p className="border border-dashed border-line/25 px-4 py-10 text-center text-[12px] text-oncanvas/35">
-          这一组还没有卡
+          这一组还没有卡。打印一张新的空白卡试试。
         </p>
       )}
 

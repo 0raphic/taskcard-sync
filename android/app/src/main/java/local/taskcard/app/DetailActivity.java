@@ -263,7 +263,7 @@ public class DetailActivity extends AppCompatActivity {
         if (checklistBox == null) return;
         checklistBox.removeAllViews();
         if (checklist.length() == 0) {
-            checklistBox.addView(Ui.label(this, "还没有小步骤，可以在网页里加"));
+            checklistBox.addView(Ui.label(this, "还没有清单项，可在网页端添加。"));
             return;
         }
         for (int i = 0; i < checklist.length(); i++) {
@@ -310,7 +310,7 @@ public class DetailActivity extends AppCompatActivity {
         try {
             JSONObject body = collect();
             if (body.optString("title").isEmpty()) {
-                Ui.toast(this, "标题不能空");
+                Ui.toast(this, "标题不能为空。");
                 return;
             }
             Api.patch(this, "/api/collections/tasks/records/" + id, body, new Api.Cb() {
@@ -327,7 +327,7 @@ public class DetailActivity extends AppCompatActivity {
                                     if (next != null) due = next.optString("due");
                                 } catch (Exception ignored) {
                                 }
-                                Ui.toast(DetailActivity.this, due.isEmpty() ? "已完成" : "已完成，下一张 " + due);
+                                Ui.toast(DetailActivity.this, due.isEmpty() ? "已标记完成" : "已标记完成，下一张 " + due);
                                 finish();
                             }
 
@@ -339,7 +339,7 @@ public class DetailActivity extends AppCompatActivity {
                         });
                         return;
                     }
-                    Ui.toast(DetailActivity.this, "已保存");
+                    Ui.toast(DetailActivity.this, "已保存。");
                     finish();
                 }
 
@@ -353,7 +353,7 @@ public class DetailActivity extends AppCompatActivity {
                 }
             });
         } catch (Exception e) {
-            Ui.toast(this, "保存失败：" + e.getMessage());
+            Ui.toast(this, "保存没有成功。" + e.getMessage());
         }
     }
 
@@ -375,12 +375,12 @@ public class DetailActivity extends AppCompatActivity {
     private void confirmDelete() {
         new MaterialAlertDialogBuilder(this)
                 .setTitle("删掉这张卡？")
-                .setMessage("删了就找不回来，纸卡上的短码也会失效。")
+                .setMessage("删除后无法恢复，纸卡上的短码也会同时失效。")
                 .setPositiveButton("删除", (d, w) -> Api.delete(this,
                         "/api/collections/tasks/records/" + id, new Api.Cb() {
                             @Override
                             public void ok(String b) {
-                                Ui.toast(DetailActivity.this, "删掉了");
+                                Ui.toast(DetailActivity.this, "已删除。这张纸卡同时失效。");
                                 finish();
                             }
 

@@ -75,9 +75,9 @@ export function Capture() {
       };
       if (!res.ok || !body.ok) throw new Error(body.error || `HTTP ${res.status}`);
       setDraft(normalize(body.task));
-      if (body.fallback) setFlash('没配 DeepSeek Key，用本地规则拆的，核对一下即可');
+      if (body.fallback) setFlash('未配置 DeepSeek Key，已用本地规则拆分，请核对后保存。');
     } catch (e) {
-      setFlash(`解析失败：${e instanceof Error ? e.message : String(e)}`);
+      setFlash(`没有解析成功。${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -99,14 +99,14 @@ export function Capture() {
 
   async function fromImage(file: File | Blob) {
     setBusy(true);
-    setFlash('照片处理中…');
+    setFlash('正在处理照片…');
     setRaw(null);
     setScanned(null);
     try {
       const dataUrl = await fileToJpegDataUrl(file);
 
       // 第一步永远是扫二维码：它决定这是「哪一张卡」，而不是一张新卡
-      setFlash('先扫右上角的二维码…');
+      setFlash('先扫右上角的二维码，确认是哪一张卡…');
       const scanRes = await fetch('/ds-api/scan', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -122,12 +122,12 @@ export function Capture() {
       if (scanRes.ok && scanBody.ok && scanBody.card && scanBody.code) {
         setDraft({ ...normalize(scanBody.fields), status: 'todo' });
         setScanned({ code: scanBody.code, id: scanBody.card.id, title: scanBody.card.title });
-        setFlash(`认出卡片：短码 ${scanBody.code}，核对卡面上的字，保存就写回这张卡`);
+        setFlash(`已认出这张卡（${scanBody.code}）。核对卡面内容，保存后写回。`);
         return;
       }
 
       // 扫不到码（没拍全 / 不是我们的卡）时退回「当新卡识别」，别让用户卡住
-      setFlash(`没认出卡片：${scanBody.error || `HTTP ${scanRes.status}`}，按新卡识别…`);
+      setFlash(`没有认出卡片（${scanBody.error || `HTTP ${scanRes.status}`}），按新卡识别…`);
       const res = await fetch('/ds-api/ocr', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -145,9 +145,9 @@ export function Capture() {
         setRaw(body.text);
       }
       if (body.task) setDraft({ ...EMPTY, ...body.task });
-      setFlash('识别完成，核对一下再保存');
+      setFlash('识别完成，核对后保存。');
     } catch (e) {
-      setFlash(`识别失败：${e instanceof Error ? e.message : String(e)}`);
+      setFlash(`没有识别出来。${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -157,7 +157,7 @@ export function Capture() {
 
   async function save() {
     if (!draft || !draft.title.trim()) {
-      setFlash('至少要有标题');
+      setFlash('至少填一个标题再保存。');
       return;
     }
     setBusy(true);
@@ -178,7 +178,7 @@ export function Capture() {
       if (scanned) {
         // 扫到的卡：把卡面内容写回这条记录，并把它从「空白卡」变成真实任务
         await pb.collection('tasks').update(scanned.id, { ...payload, draft: false });
-        setFlash(`已写回短码 ${scanned.code} 的那张卡`);
+        setFlash(`已写回这张卡（${scanned.code}）。`);
         if (queue.length > 0) {
           setQueue((q) => q.slice(1));
           void fromImage(queue[0]);
@@ -199,7 +199,7 @@ export function Capture() {
 
       const code = shortCode();
       await pb.collection('short_links').create({ code, task: task.id, active: true, scans: 0 });
-      setFlash(`已创建 · 短码 ${code}`);
+      setFlash(`已新建任务，短码 ${code}。打印纸卡后即可扫码。`);
       if (queue.length > 0) {
         setQueue((q) => q.slice(1));
         void fromImage(queue[0]);
@@ -207,7 +207,7 @@ export function Capture() {
       }
       navigate(`/tasks/${task.id}`);
     } catch (e) {
-      setFlash(`保存失败：${e instanceof Error ? e.message : String(e)}`);
+      setFlash(`保存没有成功。${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -217,9 +217,9 @@ export function Capture() {
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-5">
       <header>
         <p className="font-mono text-[11px] tracking-[0.18em] text-oncanvas/40">录入</p>
-        <h1 className="mt-1 text-[24px] font-semibold tracking-tight">把纸卡上的内容丢进来</h1>
+        <h1 className="mt-1 text-[24px] font-semibold tracking-tight">把纸卡上的内容记下来</h1>
         <p className="mt-1 text-[12px] leading-relaxed text-oncanvas/45">
-          粘一段文字，DeepSeek 会拆成结构化字段；没配 Key 就用本地规则拆（标题、截止、用时、材料、备注都认）。
+          粘贴一段文字，自动拆成标题、优先级、截止、材料等字段。没配 Key 时用本地规则，结果同样可编辑。
         </p>
       </header>
 

@@ -15,9 +15,9 @@ type Column = {
 };
 
 const COLUMNS: Column[] = [
-  { key: 'todo', title: '待办', hint: '还没开始 · 或先放着', match: (t) => !isDone(t) && t.status !== 'doing' },
-  { key: 'doing', title: '进行中', hint: '正在做', match: (t) => t.status === 'doing' },
-  { key: 'done', title: '已完成', hint: '收过的卡', match: (t) => isDone(t) },
+  { key: 'todo', title: '待办', hint: '按优先级从上往下做', match: (t) => !isDone(t) && t.status !== 'doing' },
+  { key: 'doing', title: '进行中', hint: '手上这一张', match: (t) => t.status === 'doing' },
+  { key: 'done', title: '已完成', hint: '已经收进来的', match: (t) => isDone(t) },
 ];
 
 const FOCUS: { key: 'all' | 'today' | 'overdue' | 'checklist'; label: string }[] = [
@@ -62,7 +62,7 @@ export function Board() {
         throw new Error(b.error || `生成失败 HTTP ${res.status}`);
       }
       const url = URL.createObjectURL(await res.blob());
-      if (!window.open(url, '_blank')) setFlash('浏览器拦了弹窗，允许后重试');
+      if (!window.open(url, '_blank')) setFlash('浏览器拦截了弹窗。允许后会自动打开，或点下方链接下载。');
     } catch (e) {
       setFlash(e instanceof Error ? e.message : String(e));
     } finally {
@@ -105,7 +105,7 @@ export function Board() {
     try {
       if (status === 'done') {
         const r = await completeTask(t.id);
-        setFlash(r.next ? `已完成，下一张排到 ${r.next.due}` : '已完成');
+        setFlash(r.next ? `已标记完成，下一张排到 ${r.next.due}` : '已标记完成');
       } else {
         await update(t.id, { status });
       }
@@ -124,7 +124,7 @@ export function Board() {
     try {
       if (status === 'done') {
         const r = await completeTask(id);
-        setFlash(r.next ? `已完成，下一张排到 ${r.next.due}` : '已完成');
+        setFlash(r.next ? `已标记完成，下一张排到 ${r.next.due}` : '已标记完成');
       } else {
         await update(id, { status });
       }
@@ -165,14 +165,14 @@ export function Board() {
           </h1>
         </div>
         <p className="max-w-[34ch] text-[12px] leading-relaxed text-oncanvas/45">
-          三列就是三个阶段。电脑上按住卡片拖到另一列；手机上长按卡片，弹出来选一列。
+          三列对应三个阶段。电脑上直接拖动卡片；手机上长按卡片，选一列。
         </p>
       </header>
 
       {list.length > 0 && (today.length > 0 || overdue.length > 0) && (
         <div className="flex flex-wrap items-center gap-3 border border-amber/35 bg-amber/10 px-3 py-2 text-[12px] text-oncanvas/80">
           <span>
-            今天要收的卡：{overdue.length > 0 && <b className="font-semibold">{overdue.length} 张已过期</b>}
+            今天要做完的：{overdue.length > 0 && <b className="font-semibold">{overdue.length} 张已过期</b>}
             {overdue.length > 0 && today.length > 0 && ' · '}
             {today.length > 0 && <b className="font-semibold">{today.length} 张今天到期</b>}
           </span>
@@ -201,8 +201,8 @@ export function Board() {
 
       {error && (
         <p className="border border-seal/50 bg-seal/10 px-3 py-2 text-[12px] text-oncanvas/80">
-          连不上后端：{error}
-          <span className="ml-2 text-oncanvas/50">（PocketBase 起了吗？见 README）</span>
+          连不上服务器。{error}
+          <span className="ml-2 text-oncanvas/50">（检查电脑上的 PocketBase :8090 与网页 :8088 是否在跑）</span>
         </p>
       )}
 
@@ -310,12 +310,12 @@ export function Board() {
                   ))}
                   {hidden > 0 && (
                     <Link to="/tasks" className="text-[11px] text-oncanvas/35 underline-offset-4 hover:text-oncanvas/70 hover:underline">
-                      还有 {hidden} 张 · 去全部任务看 →
+                      另有 {hidden} 张已完成 · 去全部任务查看 →
                     </Link>
                   )}
                   {items.length === 0 && (
                     <p className="border border-dashed border-line/20 px-3 py-8 text-center text-[11px] text-oncanvas/25">
-                      把卡拖到这里
+                      把卡拖到这里，或按 + 新建一张
                     </p>
                   )}
                 </div>
@@ -366,7 +366,7 @@ export function Board() {
 
       {tasks && (
         <p className="text-[11px] text-oncanvas/30">
-          看不到「搁置」？它留在待办里，卡片上会标出来 ·{' '}
+          搁置的卡留在「待办」里，卡片上会标出来 ·{' '}
           <Link to="/tasks" className="underline decoration-line/30 underline-offset-4">
             全部任务
           </Link>

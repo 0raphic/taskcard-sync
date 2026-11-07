@@ -88,7 +88,7 @@ export function Stats() {
             最近收的卡
             <span className="font-mono text-[10px] tracking-normal text-oncanvas/25">{doneList.length} 张已完成</span>
           </h2>
-          {recent.length === 0 && <p className="mt-4 text-[12px] text-oncanvas/35">还没有完成记录。</p>}
+          {recent.length === 0 && <p className="mt-4 text-[12px] text-oncanvas/35">还没有完成的卡。</p>}
           <ul className="mt-3 divide-y divide-line/10">
             {recent.map((t) => (
               <li key={t.id} className="flex items-baseline justify-between gap-3 py-2.5">

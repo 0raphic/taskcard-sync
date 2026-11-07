@@ -104,7 +104,7 @@ const pbProxy = createProxyMiddleware({
         res.writeHead(502, { 'content-type': 'application/json' });
       }
       if (res && 'end' in res) {
-        if (!res.writableEnded) res.end(JSON.stringify({ error: `PocketBase 不可达：${err.message}` }));
+        if (!res.writableEnded) res.end(JSON.stringify({ error: `服务暂时不可用，请检查 PocketBase 是否在运行。${err.message}` }));
       }
     },
   },
@@ -138,7 +138,7 @@ app.use(async (req, res, next) => {
   if (!req.path.startsWith('/ds-api/')) return next();
   if (DS_OPEN.has(req.path)) return next();
   const user = await userFromReq(req);
-  if (!user) return res.status(401).json({ ok: false, error: '先登录再操作', need_login: true });
+  if (!user) return res.status(401).json({ ok: false, error: '请先登录后再操作。', need_login: true });
   req.user = user;
   return next();
 });

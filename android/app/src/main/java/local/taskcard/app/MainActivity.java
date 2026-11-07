@@ -75,7 +75,7 @@ public class MainActivity extends AppCompatActivity {
             LinearLayout box = Ui.column(this);
             int pad = Ui.dp(this, 20);
             box.setPadding(pad, pad / 2, pad, 0);
-            box.addView(Ui.label(this, "手机和电脑连同一个 Wi-Fi。地址在电脑窗口「手机打开」后面。"));
+            box.addView(Ui.label(this, "手机与电脑连接同一 Wi-Fi。地址见电脑窗口「手机打开」。"));
             android.widget.EditText input = Ui.input(this, "http://192.168.0.108:8088",
                     Api.base(this), android.text.InputType.TYPE_CLASS_TEXT
                             | android.text.InputType.TYPE_TEXT_VARIATION_URI);
@@ -131,7 +131,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout box = Ui.column(this);
         int pad = Ui.dp(this, 20);
         box.setPadding(pad, pad / 2, pad, 0);
-        box.addView(Ui.label(this, "用电脑上设置页里那个账号登录。纸卡扫码不用登录。"));
+        box.addView(Ui.label(this, "用电脑端「设置」里的账号登录。纸卡扫码无需登录。"));
         android.widget.EditText email = Ui.input(this, "邮箱", "",
                 android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
         android.widget.EditText pass = Ui.input(this, "密码", "",
@@ -153,7 +153,7 @@ public class MainActivity extends AppCompatActivity {
                     String e = email.getText().toString().trim();
                     String pw = pass.getText().toString();
                     if (e.isEmpty() || pw.isEmpty()) {
-                        Ui.toast(this, "邮箱和密码都要填");
+                        Ui.toast(this, "请填写邮箱和密码。");
                         return;
                     }
                     try {
@@ -171,7 +171,7 @@ public class MainActivity extends AppCompatActivity {
                                     }
                                     Api.setToken(MainActivity.this, t);
                                     dialog.dismiss();
-                                    Ui.toast(MainActivity.this, "登录好了");
+                                    Ui.toast(MainActivity.this, "登录成功。");
                                     if (board != null) board.load();
                                 } catch (Exception ex) {
                                     Ui.toast(MainActivity.this, "登录响应看不懂");
@@ -180,11 +180,11 @@ public class MainActivity extends AppCompatActivity {
 
                             @Override
                             public void fail(Exception ex) {
-                                Ui.toast(MainActivity.this, "登录失败：" + ex.getMessage());
+                                Ui.toast(MainActivity.this, "登录没有成功。" + ex.getMessage());
                             }
                         });
                     } catch (Exception ex) {
-                        Ui.toast(this, "登录请求出错");
+                        Ui.toast(this, "登录请求失败，请检查网络。");
                     }
                 }));
         dialog.show();

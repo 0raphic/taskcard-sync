@@ -137,7 +137,7 @@ public class BoardFragment extends Fragment {
         holder.addView(list, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        empty = Ui.text(requireContext(), "这一格还没有卡", 14,
+        empty = Ui.text(requireContext(), "这一格还没有卡。按右下角 + 新建一张。", 14,
                 Ui.attr(requireContext(), com.google.android.material.R.attr.colorOnSurfaceVariant));
         FrameLayout.LayoutParams elp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -191,7 +191,7 @@ public class BoardFragment extends Fragment {
                     public void fail(Exception e) {
                         if (!isAdded()) return;
                         refresh.setRefreshing(false);
-                        Ui.toast(requireContext(), "连不上：" + e.getMessage());
+                        Ui.toast(requireContext(), "连不上服务器。请检查电脑端服务与 Wi-Fi。");
                     }
                 });
     }
@@ -233,7 +233,7 @@ public class BoardFragment extends Fragment {
                             @Override
                             public void ok(String b) {
                                 load();
-                                Ui.toast(requireContext(), "建好了");
+                                Ui.toast(requireContext(), "已新建。去「看板」就能看到它。");
                             }
 
                             @Override
@@ -282,7 +282,7 @@ public class BoardFragment extends Fragment {
                             if (next != null) due = next.optString("due");
                         } catch (Exception ignored) {
                         }
-                        Ui.toast(requireContext(), due.isEmpty() ? "已完成" : "已完成，下一张 " + due);
+                        Ui.toast(requireContext(), due.isEmpty() ? "已标记完成" : "已标记完成，下一张 " + due);
                         load();
                     }
 
@@ -304,7 +304,7 @@ public class BoardFragment extends Fragment {
             Api.patch(requireContext(), "/api/collections/tasks/records/" + t.id, body, new Api.Cb() {
                 @Override
                 public void ok(String b) {
-                    Ui.toast(requireContext(), "已改成" + ("doing".equals(status) ? "进行中" : "done".equals(status) ? "已完成" : status));
+                    Ui.toast(requireContext(), "已改为「" + ("doing".equals(status) ? "进行中" : "done".equals(status) ? "已完成" : "搁置") + "」");
                     load();
                 }
 
@@ -330,7 +330,7 @@ public class BoardFragment extends Fragment {
                         "/api/collections/tasks/records/" + t.id, new Api.Cb() {
                             @Override
                             public void ok(String b) {
-                                Ui.toast(requireContext(), "删掉了");
+                                Ui.toast(requireContext(), "已删除，这张纸卡同时失效。");
                                 load();
                             }
 

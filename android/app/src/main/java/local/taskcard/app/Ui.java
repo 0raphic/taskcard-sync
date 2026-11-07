@@ -97,7 +97,7 @@ public final class Ui {
         input.setHint("4–12 位数字");
         new MaterialAlertDialogBuilder(act)
                 .setTitle("需要口令")
-                .setMessage("这台设备还没有写权限，输一次口令就能改数据。")
+                .setMessage("这台设备还没有写权限。输入一次口令即可修改数据。")
                 .setView(input)
                 .setPositiveButton("保存口令", (d, w) -> {
                     String code = input.getText().toString().trim();

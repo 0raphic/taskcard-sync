@@ -55,7 +55,7 @@ public class CaptureFragment extends Fragment {
 
         root.addView(Ui.text(c, "拍一张，写回这张卡", 22,
                 Ui.attr(c, com.google.android.material.R.attr.colorOnSurface)));
-        TextView sub = Ui.label(c, "先认出右上角的码是哪张卡，再读卡面上的手写内容。");
+        TextView sub = Ui.label(c, "先认出右上角的二维码，再读卡面上的手写内容。");
         sub.setPadding(0, Ui.dp(c, 6), 0, Ui.dp(c, 18));
         root.addView(sub);
 
@@ -108,7 +108,7 @@ public class CaptureFragment extends Fragment {
                     requireContext().getPackageName() + ".files", f);
             takePicture.launch(pendingUri);
         } catch (Exception e) {
-            Ui.toast(requireContext(), "打不开相机：" + e.getMessage());
+            Ui.toast(requireContext(), "打不开相机。请检查系统权限。");
         }
     }
 
@@ -193,7 +193,7 @@ public class CaptureFragment extends Fragment {
         JSONObject card = o.optJSONObject("card");
         JSONObject f = o.optJSONObject("fields");
         if (card == null || f == null) {
-            Ui.toast(requireContext(), "没认出这张卡");
+            Ui.toast(requireContext(), "没有认出这张卡，换个角度或光线再拍。");
             return;
         }
         String code = o.optString("code");
@@ -229,7 +229,7 @@ public class CaptureFragment extends Fragment {
         box.addView(goal);
 
         new MaterialAlertDialogBuilder(requireContext())
-                .setTitle("认出来了，核对一下")
+                .setTitle("核对卡面内容")
                 .setView(box)
                 .setPositiveButton("写回这张卡", (d, w) -> {
                     try {
@@ -245,7 +245,7 @@ public class CaptureFragment extends Fragment {
                         Api.patch(requireContext(), "/api/collections/tasks/records/" + taskId, body, new Api.Cb() {
                             @Override
                             public void ok(String b) {
-                                Ui.toast(requireContext(), "写回了");
+                                Ui.toast(requireContext(), "已写回这张卡。");
                             }
 
                             @Override
@@ -258,7 +258,7 @@ public class CaptureFragment extends Fragment {
                             }
                         });
                     } catch (Exception ex) {
-                        Ui.toast(requireContext(), "写回失败：" + ex.getMessage());
+                        Ui.toast(requireContext(), "写回没有成功。" + ex.getMessage());
                     }
                 })
                 .setNegativeButton("取消", null)

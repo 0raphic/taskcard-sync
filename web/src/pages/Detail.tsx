@@ -105,7 +105,7 @@ export function Detail({ id }: { id: string }) {
     try {
       if (status === 'done') {
         const r = await completeTask(id);
-        setFlash(r.next ? `已完成，下一张排到 ${r.next.due}` : '已标记完成');
+        setFlash(r.next ? `已标记完成，下一张排到 ${r.next.due}` : '已标记完成');
       } else {
         await update(id, { status });
         setFlash(`已改为「${STATUS_LABEL[status]}」`);
@@ -190,7 +190,7 @@ export function Detail({ id }: { id: string }) {
           <section className="space-y-1.5">
               <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">
                 卡面上的规划
-                <span className="ml-2 text-[10px] tracking-normal text-oncanvas/30">改完点空白处就存</span>
+                <span className="ml-2 text-[10px] tracking-normal text-oncanvas/30">改完点空白处自动保存</span>
               </h2>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-[11px] text-oncanvas/45">
@@ -392,7 +392,7 @@ export function Detail({ id }: { id: string }) {
               </button>
             </div>
             {logs.length === 0 ? (
-              <p className="text-[11px] text-oncanvas/30">还没有记录。</p>
+              <p className="text-[11px] text-oncanvas/30">还没有进展记录。</p>
             ) : (
               <ul className="flex flex-col divide-y divide-line/40">
                 {logs.map((row) => (
@@ -418,7 +418,7 @@ export function Detail({ id }: { id: string }) {
                 >
                   删除这张任务卡
                 </button>
-                <span className="text-[11px] text-oncanvas/35">删了就找不回来。</span>
+                <span className="text-[11px] text-oncanvas/35">删除后无法恢复，对应的纸卡也会同时失效。</span>
               </div>
             ) : (
               <div className="flex flex-col gap-3">

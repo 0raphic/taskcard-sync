@@ -29,7 +29,7 @@ public class ReminderReceiver extends BroadcastReceiver {
             Notification n = new Notification.Builder(context, Reminders.CHANNEL)
                     .setSmallIcon(android.R.drawable.ic_popup_reminder)
                     .setContentTitle("今天的卡")
-                    .setContentText("看看看板上今天到期的任务，别让纸卡过期。")
+                    .setContentText("去「看板」看看今天到期的卡。")
                     .setAutoCancel(true)
                     .setContentIntent(PendingIntent.getActivity(context, 1,
                             new Intent(context, MainActivity.class),

@@ -27,9 +27,9 @@ export function Landing({ code }: { code: string }) {
     try {
       await update(task.id, { status });
       setFlash(`已标记为「${STATUS_LABEL[status]}」`);
-      setDone({ title: `已标记为「${STATUS_LABEL[status]}」`, hint: '看板上已经同步，不用刷新。' });
+      setDone({ title: `已标记为「${STATUS_LABEL[status]}」`, hint: '看板已同步，无需刷新。' });
     } catch (e) {
-      setFlash(`没改成：${message(e)}`);
+      setFlash(`状态没有改成。${message(e)}`);
     } finally {
       setPending(null);
     }
@@ -49,10 +49,10 @@ export function Landing({ code }: { code: string }) {
         title: '这张卡做完了',
         hint: r.next
           ? `下一张已经排到 ${r.next.due}，看板上能直接看到。`
-          : '看板上已经进「已完成」，纸卡可以收进文件夹。',
+          : '看板已把它收进「已完成」，这张纸可以收进文件夹了。',
       });
     } catch (e) {
-      setFlash(`没改成：${message(e)}`);
+      setFlash(`状态没有改成。${message(e)}`);
     } finally {
       setPending(null);
     }
@@ -107,9 +107,9 @@ export function Landing({ code }: { code: string }) {
         progress: long && typeof f.progress === 'number' ? f.progress : null,
         milestones: long ? ['', '', ''] : [],
       });
-      setFlash('认出来了，核对一下再保存');
+      setFlash('已识别卡面，核对后写回。');
     } catch (e) {
-      setFlash(`没认出来：${message(e)}`);
+      setFlash(`没有识别出来。${message(e)}`);
     } finally {
       setScanning(false);
     }
@@ -147,16 +147,16 @@ export function Landing({ code }: { code: string }) {
       const goal = (fields.goal ?? '').trim();
       if (task.kind === 'long' && goal) payload.goal = goal;
       if (Object.keys(payload).length === 0) {
-        setFlash('卡面上没读到内容，可以把字写清楚一点再拍');
+        setFlash('没有读到卡面内容。把字写清楚、光线均匀一点再拍。');
         return;
       }
       await update(task.id, payload);
       setFields(null);
-      setFlash('已经写回这张卡，看板同步更新了');
+      setFlash('已写回这张卡，看板同步更新。');
       setDone({ title: '已写回这张卡', hint: '看板、全部任务里都是新内容了。' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
-      setFlash(`没写回去：${message(e)}`);
+      setFlash(`没有写回。${message(e)}`);
     } finally {
       setSaving(false);
     }
@@ -170,7 +170,7 @@ export function Landing({ code }: { code: string }) {
       await update(task.id, { progress: Math.max(0, Math.min(100, (task.progress ?? 0) + delta)) });
       setFlash(`进度 ${Math.max(0, Math.min(100, (task.progress ?? 0) + delta))}%`);
     } catch (e) {
-      setFlash(`没改成：${message(e)}`);
+      setFlash(`状态没有改成。${message(e)}`);
     }
   }
 
@@ -179,9 +179,9 @@ export function Landing({ code }: { code: string }) {
     try {
       await logProgress(task.id, note.trim());
       setNote('');
-      setFlash('进展记下了');
+      setFlash('进展已记录。');
     } catch (e) {
-      setFlash(`没记上：${message(e)}`);
+      setFlash(`没有记上。${message(e)}`);
     }
   }
 

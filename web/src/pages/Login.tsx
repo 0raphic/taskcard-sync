@@ -41,7 +41,7 @@ export function Login() {
           {mode === 'login' ? '登录，回到你的卡' : '建一个账号'}
         </h1>
         <p className="mt-2 text-[13px] leading-relaxed text-oncanvas/55">
-          账号只存这台电脑的 PocketBase 里。纸卡扫码页不用登录，谁拿着卡都能改那张卡。
+          账号保存在这台电脑的 PocketBase 中。纸卡扫码无需登录。
         </p>
 
         <form onSubmit={submit} className="mt-6 flex flex-col gap-3">

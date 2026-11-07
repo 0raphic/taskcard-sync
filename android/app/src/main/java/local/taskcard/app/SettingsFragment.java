@@ -38,7 +38,7 @@ public class SettingsFragment extends Fragment {
 
         root.addView(Ui.text(c, "设置", 22,
                 Ui.attr(c, com.google.android.material.R.attr.colorOnSurface)));
-        TextView sub = Ui.label(c, "手机和电脑连同一个 Wi-Fi；地址填电脑那边「手机打开」的地址。");
+        TextView sub = Ui.label(c, "手机与电脑连接同一 Wi-Fi；地址见电脑端「手机打开」。");
         sub.setPadding(0, Ui.dp(c, 6), 0, Ui.dp(c, 18));
         root.addView(sub);
 
@@ -55,7 +55,7 @@ public class SettingsFragment extends Fragment {
         root.addView(save, slp);
         save.setOnClickListener(v -> {
             Api.setBase(requireContext(), base.getText().toString().trim());
-            Ui.toast(requireContext(), "保存了");
+            Ui.toast(requireContext(), "已保存。");
         });
 
         MaterialButton test = new MaterialButton(c, null,
@@ -74,12 +74,12 @@ public class SettingsFragment extends Fragment {
             Api.get(requireContext(), "/ds-api/health", new Api.Cb() {
                 @Override
                 public void ok(String body) {
-                    status.setText("连上了：" + body);
+                    status.setText("连接正常：" + body);
                 }
 
                 @Override
                 public void fail(Exception e) {
-                    status.setText("失败：" + e.getMessage());
+                    status.setText("连接失败。" + e.getMessage());
                 }
             });
         });
@@ -122,8 +122,8 @@ public class SettingsFragment extends Fragment {
 
         root.addView(Ui.label(c, "账号"));
         TextView acc = Ui.label(c, Api.token(c).isEmpty()
-                ? "还没登录。"
-                : "已登录（token 存在这台手机上）。纸卡扫码页不用登录，谁拿着卡都能改那张卡。");
+                ? "未登录。"
+                : "已登录。纸卡扫码无需登录，拿到卡的人都能改。");
         acc.setPadding(0, Ui.dp(c, 6), 0, 0);
         root.addView(acc);
 
@@ -138,7 +138,7 @@ public class SettingsFragment extends Fragment {
             root.addView(logout, llp);
             logout.setOnClickListener(v -> {
                 Api.setToken(c, "");
-                Ui.toast(c, "已退出，重新登录");
+                Ui.toast(c, "已退出登录。");
                 if (getActivity() instanceof MainActivity) ((MainActivity) getActivity()).promptLogin();
             });
         }
