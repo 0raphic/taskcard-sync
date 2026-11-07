@@ -5,15 +5,15 @@ import { copyFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..');
-const SDK = process.env.ANDROID_SDK_ROOT || 'D:\\Android\\Sdk';
-const GRADLE = join(ROOT, 'tools', 'gradle', 'gradle-8.10.2', 'bin', 'gradle.bat');
+const SDK = process.env.ANDROID_SDK_ROOT || 'D:/Application/Android/Sdk';
+const GRADLE = process.env.GRADLE_BIN || 'D:/Application/gradle/gradle-8.10.2/bin/gradle.bat';
 const JAVA_HOME = process.env.JAVA_HOME || 'C:\\Program Files\\Java\\jdk-22';
 const APK = join(ROOT, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
 const OUT_DIR = join(ROOT, 'dist');
 const OUT = join(OUT_DIR, 'taskcard.apk');
 
 if (!existsSync(GRADLE)) {
-  console.error('没找到 Gradle。先跑一次 tools/install-android.mjs，并把 gradle 解压到 tools/gradle/。');
+  console.error('没找到 Gradle。解压到 D:/Application/gradle/，或用 GRADLE_BIN 指向 gradle.bat。');
   process.exit(1);
 }
 if (!existsSync(join(SDK, 'platforms'))) {
@@ -28,7 +28,7 @@ if (!existsSync(join(ROOT, 'android', 'local.properties'))) {
 console.log('[apk] 编译中…');
 execSync(`"${GRADLE}" -p "${join(ROOT, 'android')}" assembleDebug --no-daemon`, {
   stdio: 'inherit',
-  env: { ...process.env, JAVA_HOME, GRADLE_USER_HOME: process.env.GRADLE_USER_HOME || 'D:\gradle-home' },
+  env: { ...process.env, JAVA_HOME, GRADLE_USER_HOME: process.env.GRADLE_USER_HOME || 'D:/Application/gradle/home' },
 });
 
 mkdirSync(OUT_DIR, { recursive: true });

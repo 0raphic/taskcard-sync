@@ -1,13 +1,13 @@
 // 安装 Android SDK（命令行工具 + platform-tools + platform + build-tools）
 // 用法：node tools/install-android.mjs
-// 默认装到 D:\Android\Sdk，可用 ANDROID_SDK_ROOT 覆盖
+// 默认装到 D:\Application\Android\Sdk，可用 ANDROID_SDK_ROOT 覆盖
 import { spawn } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-const SDK = process.env.ANDROID_SDK_ROOT || 'D:\\Android\\Sdk';
+const SDK = process.env.ANDROID_SDK_ROOT || 'D:/Application/Android/Sdk';
 const CACHE = join(import.meta.dirname, '..', '.cache');
 const ZIP = join(CACHE, 'cmdline-tools.zip');
 const URL =
