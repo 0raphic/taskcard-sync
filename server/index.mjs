@@ -503,6 +503,7 @@ async function ensureCodes(tasks) {
 function cardsPayload(tasks, codes, baseUrl, { blank = false } = {}) {
   return {
     base_url: baseUrl,
+    blank,
     tasks: tasks.map((t) => ({
       id: t.id,
       code: codes.get(t.id),

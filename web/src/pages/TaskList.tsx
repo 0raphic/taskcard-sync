@@ -71,10 +71,10 @@ export function TaskList() {
         ))}
         </div>
         <Link
-          to={shown.length ? `/print?ids=${shown.map((t) => t.id).join(',')}` : '/print'}
+          to="/print"
           className="shrink-0 border border-paper/20 px-3 py-1.5 text-[12px] text-paper/65 hover:border-paper/45"
         >
-          把这几张排成 A4 →
+          打印空白卡 →
         </Link>
       </div>
 

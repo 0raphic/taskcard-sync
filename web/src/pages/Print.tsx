@@ -1,6 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useTasks } from '../lib/data';
-import { STATUS_LABEL, type Task } from '../lib/types';
+import { useEffect, useState } from 'react';
+
+type Kind = 'short' | 'long';
+
+const SHORT_FIELDS = [
+  ['任务', '一句话说清要交付什么'],
+  ['优先级', '重要且紧急 / 重要不紧急 / 紧急不重要 / 其他'],
+  ['完成标准', '做到什么程度算完'],
+  ['下一步', '下一个具体动作'],
+  ['截止 · 时间盒', '____  ·  ____ 分'],
+  ['情境', '电脑 / 电话 / 外出 / 家里 / 随时'],
+  ['材料', '要不要借、要不要买'],
+  ['复盘', '实际 ___ 分 · 一句体会'],
+];
+
+const LONG_FIELDS = [
+  ['O 目标', '一个季度只写一句'],
+  ['KR 关键结果', 'K1 / K2 / K3，写到能打勾'],
+  ['周期', '起 ___ 止 ___ · 每周 ___ 小时'],
+  ['里程碑', '三个可勾选的小目标'],
+  ['进度', '十个格子，做一格涂一格'],
+  ['资源', '要谁配合、要什么'],
+  ['本周', '推进 / 卡点 / 下一步'],
+];
 
 function hintNoLan(url: string) {
   try {
@@ -11,20 +32,58 @@ function hintNoLan(url: string) {
   }
 }
 
-type Mode = 'content' | 'blank';
+function CardPreview({ kind }: { kind: Kind }) {
+  const fields = kind === 'short' ? SHORT_FIELDS : LONG_FIELDS;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between text-[11px] text-paper/40">
+        <span>卡面预览（1/8 A4 · 105 × 74.25mm）</span>
+        <span className="font-mono">{kind === 'short' ? '短期卡' : '长期卡'}</span>
+      </div>
+      <div
+        className="relative w-full border border-dashed border-paper/25 bg-paper px-4 py-3 text-ink"
+        style={{ aspectRatio: '105 / 74.25' }}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-[10px] font-semibold tracking-[0.12em] text-seal">
+              {kind === 'short' ? '任务卡' : '目标卡'}
+            </p>
+            <p className="mt-0.5 text-[9px] text-ink-soft">
+              {kind === 'short' ? '短期 · 1/8 A4' : '长期 · OKR'}
+            </p>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className="grid grid-cols-4 gap-[1px] bg-ink p-[2px]">
+              {Array.from({ length: 16 }).map((_, i) => (
+                <span key={i} className={`h-[3px] w-[3px] ${i % 3 ? 'bg-paper' : 'bg-ink'}`} />
+              ))}
+            </div>
+            <span className="mt-0.5 font-mono text-[7px] text-ink-soft">A7K2m9</span>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-col gap-[5px]">
+          {fields.map(([name]) => (
+            <div key={name} className="flex items-baseline gap-1.5">
+              <span className="w-[52px] shrink-0 text-[7.5px] text-ink-soft">{name}</span>
+              <span className="h-[1px] flex-1 bg-ink/25" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function Print() {
-  const { tasks, error } = useTasks();
-  const [mode, setMode] = useState<Mode>('content');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [baseUrl, setBaseUrl] = useState('');
   const [netHint, setNetHint] = useState<{ url: string; lan: boolean } | null>(null);
+  const [kind, setKind] = useState<Kind>('short');
+  const [count, setCount] = useState(8);
   const [doubleSided, setDoubleSided] = useState(false);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [blankCount, setBlankCount] = useState(8);
-  const [blankKind, setBlankKind] = useState<'short' | 'long'>('short');
 
   useEffect(() => {
     fetch('/ds-api/net')
@@ -38,90 +97,33 @@ export function Print() {
       .catch(() => {});
   }, []);
 
-  // 空白卡在数据库里是占位任务（draft），打印内容卡的列表里不展示
-  const all = useMemo(() => (tasks ?? []).filter((t) => !t.draft), [tasks]);
-
-  // 首次进来：?ids=… 用带进来的；否则默认勾「未完成」
-  useEffect(() => {
-    if (!all.length) return;
-    setSelected((prev) => {
-      if (prev.size) return prev;
-      const q = new URLSearchParams(window.location.search).get('ids');
-      if (q) {
-        const valid = new Set(q.split(',').filter((id) => all.some((t) => t.id === id)));
-        if (valid.size) return valid;
-      }
-      return new Set(all.filter((t) => t.status !== 'done').map((t) => t.id));
-    });
-  }, [all]);
-
   useEffect(() => () => {
     if (preview) URL.revokeObjectURL(preview);
   }, [preview]);
 
-  const chosen = all.filter((t) => selected.has(t.id));
   const noLan = baseUrl ? hintNoLan(baseUrl) : false;
 
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function selectWhere(fn: (t: Task) => boolean) {
-    setSelected(new Set(all.filter(fn).map((t) => t.id)));
-  }
-
-  function openBlob(blob: Blob, label: string) {
-    const url = URL.createObjectURL(blob);
-    setPreview(url);
-    const win = window.open(url, '_blank');
-    if (!win) setFlash('浏览器拦了弹窗，点下面「打开 PDF」');
-    else setFlash(label);
-  }
-
   async function generate() {
-    if (!chosen.length) {
-      setFlash('先选至少一张卡');
-      return;
-    }
-    setBusy(true);
-    setFlash(null);
-    try {
-      const res = await fetch('/ds-api/cards.pdf', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ids: chosen.map((t) => t.id), base_url: baseUrl, double_sided: doubleSided }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error || `生成失败 HTTP ${res.status}`);
-      }
-      openBlob(await res.blob(), `已生成 ${chosen.length} 张卡`);
-    } catch (e) {
-      setFlash(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function generateBlank() {
     setBusy(true);
     setFlash(null);
     try {
       const res = await fetch('/ds-api/cards.blank', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ count: blankCount, kind: blankKind, base_url: baseUrl, double_sided: doubleSided }),
+        body: JSON.stringify({ count, kind, base_url: baseUrl, double_sided: doubleSided }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error || `生成失败 HTTP ${res.status}`);
       }
-      openBlob(await res.blob(), `已生成 ${blankCount} 张空白卡（每张的二维码都不同）`);
+      const url = URL.createObjectURL(await res.blob());
+      setPreview(url);
+      const win = window.open(url, '_blank');
+      setFlash(
+        win
+          ? `已生成 ${count} 张空白卡，每张的二维码都不同`
+          : '浏览器拦了弹窗，点下面「打开 PDF」',
+      );
     } catch (e) {
       setFlash(e instanceof Error ? e.message : String(e));
     } finally {
@@ -130,146 +132,104 @@ export function Print() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-5">
+    <div className="mx-auto flex w-full max-w-[980px] flex-col gap-5">
       <header>
         <p className="font-mono text-[11px] tracking-[0.18em] text-paper/40">打印</p>
-        <h1 className="mt-1 text-[24px] font-semibold tracking-tight">
-          {mode === 'content' ? '把选中的卡排成 A4' : '打印一叠空白表'}
-        </h1>
-        <p className="mt-1 text-[12px] leading-relaxed text-paper/45">
-          {mode === 'content'
-            ? '一页 8 张（2×4，1/8 A4），二维码自动指向下面的地址。双面时每页正面后跟一页「复盘」背面。'
-            : '空白表不印内容，但每张仍带一个唯一二维码——那是卡片的身份证。拍卡时先扫码认出是哪张，再读上面的手写内容。'}
+        <h1 className="mt-1 text-[24px] font-semibold tracking-tight">打印一叠空白卡</h1>
+        <p className="mt-1 max-w-[640px] text-[12px] leading-relaxed text-paper/45">
+          只印空白表：每张带一个唯一二维码，是这张纸的身份证。写完拍照，先扫码认出是哪张卡，
+          再读上面的手写内容——任务改名、换数据库，这张纸也不会失效。
         </p>
       </header>
 
-      <div className="flex gap-2 text-[12px]">
-        <button
-          type="button"
-          onClick={() => setMode('content')}
-          className={`border px-3 py-1.5 ${mode === 'content' ? 'border-seal/60 bg-seal/10 text-paper' : 'border-paper/20 text-paper/60 hover:border-paper/45'}`}
-        >
-          有内容的卡
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('blank')}
-          className={`border px-3 py-1.5 ${mode === 'blank' ? 'border-seal/60 bg-seal/10 text-paper' : 'border-paper/20 text-paper/60 hover:border-paper/45'}`}
-        >
-          空白表
-        </button>
-      </div>
-
-      <section className="flex flex-col gap-2 border border-paper/15 p-3">
-        <label className="text-[11px] tracking-[0.14em] text-paper/45">二维码指向（手机要能打开这个地址）</label>
-        <input
-          value={baseUrl}
-          onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder="http://192.168.0.108:8088"
-          className="w-full border border-paper/20 bg-transparent px-3 py-2 font-mono text-[12px] text-paper placeholder:text-paper/25 focus:border-paper/40"
-        />
-        {noLan && (
-          <p className="text-[11px] leading-relaxed text-amber">
-            这是本机地址，手机扫不开。换成电脑的局域网 IP（{netHint?.url || 'http://192.168.x.x:8088'}）。
-          </p>
-        )}
-      </section>
-
-      {mode === 'content' ? (
-        <>
-          <section className="flex flex-wrap items-center gap-2 text-[12px]">
-            <button type="button" onClick={() => selectWhere(() => true)} className="border border-paper/20 px-3 py-1.5 text-paper/70 hover:border-paper/45">
-              全选
-            </button>
-            <button type="button" onClick={() => setSelected(new Set())} className="border border-paper/20 px-3 py-1.5 text-paper/70 hover:border-paper/45">
-              清空
-            </button>
-            <button type="button" onClick={() => selectWhere((t) => t.status !== 'done')} className="border border-paper/20 px-3 py-1.5 text-paper/70 hover:border-paper/45">
-              只选未完成
-            </button>
-            <span className="ml-auto font-mono text-paper/50">
-              已选 {chosen.length} / {all.length} 张
-            </span>
+      <div className="grid gap-6 md:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-4">
+          <section className="flex flex-col gap-2 border border-paper/15 p-3">
+            <label className="text-[11px] tracking-[0.14em] text-paper/45">二维码指向（手机要能打开）</label>
+            <input
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="http://192.168.0.108:8088"
+              className="w-full border border-paper/20 bg-transparent px-3 py-2 font-mono text-[12px] text-paper placeholder:text-paper/25 focus:border-paper/40"
+            />
+            {noLan && (
+              <p className="text-[11px] leading-relaxed text-amber">
+                这是本机地址，手机扫不开。换成电脑的局域网 IP（{netHint?.url || 'http://192.168.x.x:8088'}）。
+              </p>
+            )}
           </section>
 
-          {error && <p className="text-[13px] text-seal">{error}</p>}
-          {!all.length && !error && <div className="h-[240px] animate-pulse bg-paper/10" />}
-
-          <div className="max-h-[46vh] divide-y divide-white/5 overflow-auto border border-paper/15">
-            {all.map((t) => {
-              const on = selected.has(t.id);
-              return (
-                <label
-                  key={t.id}
-                  className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-paper/[0.04]"
+          <section className="flex flex-col gap-3 border border-paper/15 p-3">
+            <div className="flex items-center gap-2 text-[12px]">
+              <span className="w-[52px] shrink-0 text-paper/45">卡型</span>
+              {(['short', 'long'] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setKind(k)}
+                  className={`border px-3 py-1.5 ${kind === k ? 'border-seal/60 bg-seal/10 text-paper' : 'border-paper/20 text-paper/60 hover:border-paper/45'}`}
                 >
-                  <input type="checkbox" checked={on} onChange={() => toggle(t.id)} className="accent-seal" />
-                  <span className={`min-w-0 flex-1 truncate text-[13px] ${on ? 'text-paper' : 'text-paper/55'}`}>
-                    {t.title}
-                  </span>
-                  <span className="shrink-0 font-mono text-[10px] text-paper/30">
-                    {t.kind === 'long' ? '长期' : '短期'} · {STATUS_LABEL[t.status ?? 'todo']}
-                    {t.due ? ` · ${t.due}` : ''}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </>
-      ) : (
-        <section className="flex flex-col gap-3 border border-paper/15 p-4">
-          <div className="flex flex-wrap items-center gap-3 text-[12px]">
-            <span className="text-[11px] tracking-[0.14em] text-paper/45">卡型</span>
-            {(['short', 'long'] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setBlankKind(k)}
-                className={`border px-3 py-1.5 ${blankKind === k ? 'border-seal/60 bg-seal/10 text-paper' : 'border-paper/20 text-paper/60 hover:border-paper/45'}`}
-              >
-                {k === 'short' ? '短期卡（任务）' : '长期卡（目标）'}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-[12px]">
-            <span className="text-[11px] tracking-[0.14em] text-paper/45">张数</span>
-            {[8, 16, 24].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setBlankCount(n)}
-                className={`border px-3 py-1.5 font-mono ${blankCount === n ? 'border-seal/60 bg-seal/10 text-paper' : 'border-paper/20 text-paper/60 hover:border-paper/45'}`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-          <p className="text-[11px] leading-relaxed text-paper/40">
-            每张空白卡会先在系统里建一条「占位」记录（不在看板显示），拿到自己的短码；拍卡识别成功后，内容写进这条记录，它才会出现在看板上。
-          </p>
-        </section>
-      )}
+                  {k === 'short' ? '短期卡（任务）' : '长期卡（目标）'}
+                </button>
+              ))}
+            </div>
 
-      <label className="flex items-center gap-2 text-[12px] text-paper/70">
-        <input type="checkbox" checked={doubleSided} onChange={(e) => setDoubleSided(e.target.checked)} className="accent-seal" />
-        双面打印（正面卡 + 背面复盘，沿长边翻页）
-      </label>
+            <div className="flex items-center gap-2 text-[12px]">
+              <span className="w-[52px] shrink-0 text-paper/45">张数</span>
+              {[8, 16, 24].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setCount(n)}
+                  className={`border px-3 py-1.5 font-mono ${count === n ? 'border-seal/60 bg-seal/10 text-paper' : 'border-paper/20 text-paper/60 hover:border-paper/45'}`}
+                >
+                  {n}
+                </button>
+              ))}
+              <span className="ml-2 text-[11px] text-paper/35">一页 8 张</span>
+            </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={mode === 'content' ? generate : generateBlank}
-          disabled={busy || (mode === 'content' && !chosen.length)}
-          className="bg-seal px-5 py-2.5 text-[13px] font-medium text-white transition-colors hover:brightness-110 disabled:opacity-40"
-        >
-          {busy ? '排版中…' : mode === 'content' ? `生成 PDF（${chosen.length} 张）` : `生成空白表（${blankCount} 张）`}
-        </button>
-        {preview && (
-          <a href={preview} target="_blank" rel="noreferrer" className="border border-paper/25 px-3 py-2 text-[12px] text-paper/75 hover:border-paper/50">
-            打开 PDF
-          </a>
-        )}
-        {flash && <span className="text-[12px] text-paper/50">{flash}</span>}
+            <label className="flex items-center gap-2 text-[12px] text-paper/70">
+              <input
+                type="checkbox"
+                checked={doubleSided}
+                onChange={(e) => setDoubleSided(e.target.checked)}
+                className="accent-seal"
+              />
+              双面打印（正面卡片 + 背面复盘卡）
+            </label>
+
+            <p className="text-[11px] leading-relaxed text-paper/35">
+              每张空白卡先在库里建一条「占位」记录（不在看板显示）。拍到哪张，内容就写回哪条，
+              保存后它才出现在看板上。
+            </p>
+
+            <button
+              type="button"
+              onClick={generate}
+              disabled={busy}
+              className="mt-1 self-start bg-seal px-5 py-2.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {busy ? '排版中…' : `生成空白卡（${count} 张）`}
+            </button>
+
+            {flash && <p className="text-[12px] leading-relaxed text-paper/60">{flash}</p>}
+            {preview && (
+              <a
+                href={preview}
+                target="_blank"
+                rel="noreferrer"
+                className="self-start border border-paper/25 px-3 py-1.5 text-[12px] text-paper/75 hover:border-paper/50"
+              >
+                打开 PDF
+              </a>
+            )}
+          </section>
+        </div>
+
+        <div className="hidden md:block">
+          <CardPreview kind={kind} />
+        </div>
       </div>
     </div>
   );
