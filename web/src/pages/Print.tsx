@@ -22,8 +22,6 @@ const LONG_FIELDS = [
 
 function CardPreview({ kind }: { kind: Kind }) {
   const fields = (kind === 'short' ? SHORT_FIELDS : LONG_FIELDS).map(([n]) => n);
-  const barcode =
-    'repeating-linear-gradient(90deg,#17181a 0 1px,transparent 1px 3px,#17181a 3px 5px,transparent 5px 6px,#17181a 6px 7px,transparent 7px 10px)';
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between text-[11px] text-oncanvas/40">
@@ -32,35 +30,23 @@ function CardPreview({ kind }: { kind: Kind }) {
       </div>
 
       <div
-        className="relative flex w-full flex-col overflow-hidden border border-dashed border-ink/25 bg-surface px-4 pb-3 pt-4 text-ink"
+        className="relative flex w-full flex-col overflow-hidden border border-dashed border-ink/25 bg-surface px-4 pb-1 pt-2 text-ink"
         style={{ aspectRatio: '105 / 74.25' }}
       >
-        {/* 顶部镭射细带（CSS 渐变） */}
-        <div
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-[3px] opacity-80"
-          style={{
-            background:
-              'linear-gradient(90deg,#f0a8c8 0 42%,#b9a6f0 42% 60%,#8fe3f0 60% 100%)',
-          }}
-        />
-        {/* 四角十字准星 */}
-        {['left-2 top-2', 'right-2 top-2', 'left-2 bottom-2', 'right-2 bottom-2'].map((pos) => (
-          <span key={pos} aria-hidden className={`absolute ${pos} h-2 w-2`}>
-            <span className="absolute left-1/2 top-0 h-full w-px -translate-x-px bg-ink/30" />
-            <span className="absolute top-1/2 left-0 h-px w-full -translate-y-px bg-ink/30" />
-          </span>
-        ))}
-
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[15px] font-black leading-none tracking-[-0.02em]">XXY</p>
-            <p className="mt-1 font-mono text-[6px] tracking-[0.18em] text-ink-soft">
-              TASK CARD / XXY-01
+          <div className="min-w-0">
+            <p className="font-mono text-[6px] tracking-[0.22em] text-ink-soft">
+              TASK CARD
+              <span className="ml-3">SHORT · 1/8 A4</span>
+            </p>
+            <p className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-[14px] font-bold leading-none">
+                {kind === 'short' ? '任务卡' : '目标卡'}
+              </span>
+              <span className="inline-block h-2 w-2 bg-[#d6362b]" />
             </p>
           </div>
-          <div className="flex flex-col items-end">
-            {/* 二维码：CSS 点阵 */}
+          <div className="flex flex-col items-end gap-0.5">
             <div className="grid grid-cols-8 gap-px bg-ink p-[2px]">
               {Array.from({ length: 64 }).map((_, i) => (
                 <span
@@ -69,30 +55,27 @@ function CardPreview({ kind }: { kind: Kind }) {
                 />
               ))}
             </div>
-            <span className="mt-0.5 font-mono text-[6px] text-ink-soft">A7K2m9</span>
+            <span className="font-mono text-[5px] text-ink-soft">A7K2m9</span>
           </div>
         </div>
 
-        <div className="mt-3 flex flex-1 flex-col justify-between pb-6">
+        <div className="mt-1.5 h-px w-[calc(100%-74px)] bg-ink" />
+
+        <div className="mt-2 flex flex-1 flex-col justify-between pb-7">
           {fields.map((name) => (
             <div key={name} className="flex items-baseline gap-1.5">
-              <span className="w-[46px] shrink-0 text-[6.5px] tracking-wide text-ink-soft">
-                {name}
-              </span>
-              <span className="h-px flex-1 bg-ink/20" />
+              <span className="w-[44px] shrink-0 text-[5.5px] tracking-wide text-ink-soft">{name}</span>
+              <span className="h-px flex-1 bg-ink/25" />
             </div>
           ))}
         </div>
 
-        {/* 页脚：条码 + 信号条 + 序列号（全 CSS） */}
-        <div className="absolute inset-x-4 bottom-2 flex items-end gap-2">
-          <span aria-hidden className="h-3 w-[38%]" style={{ background: barcode }} />
-          <span aria-hidden className="flex h-3 items-end gap-[1px]">
-            {[.4, .8, .55, 1, .7, .35, .9, .6, .45, .85, .3, .65].map((h, i) => (
-              <span key={i} className="w-[2px] bg-ink/70" style={{ height: `${h * 100}%` }} />
-            ))}
+        <div className="absolute inset-x-4 bottom-1.5 flex items-end justify-between border-t border-ink/40 pt-1">
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-1.5 w-1.5 bg-[#d6362b]" />
+            <span className="font-mono text-[5px] tracking-[0.16em] text-ink-soft">SCAN · UPDATE</span>
           </span>
-          <span className="ml-auto font-mono text-[6px] text-ink-soft">TC/A7K2m9/4514</span>
+          <span className="font-mono text-[5px] text-ink-soft">TC A7K2m9 / 001</span>
         </div>
       </div>
     </div>

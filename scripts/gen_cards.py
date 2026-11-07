@@ -346,160 +346,192 @@ def xxy(c, x, y, size=12, color=HAIR, track=0.06):
         cx += pdfmetrics.stringWidth(ch, FONT_B, size) + size * track
 
 
+SWISS_RED = HexColor("#d6362b")
+SWISS_INK = HexColor("#141414")
+
+
+def track_text(c, s, x, y, size, color=SOFT, track=1.1, font=None):
+    """瑞士风格常用：小号大写 + 宽字距。"""
+    c.setFillColor(color)
+    cx = x
+    for ch in s:
+        c.setFont(font or FONT, size)
+        c.drawString(cx, y, ch)
+        cx += pdfmetrics.stringWidth(ch, font or FONT, size) + track
+
+
 def draw_qr_compact(c, x, y, url, code, size_mm=16.5):
     size = size_mm * mm
     tmp = Path(tempfile.gettempdir()) / f"qr_{code}.png"
     qr_image(url, str(tmp))
     c.drawImage(str(tmp), x, y, size, size, preserveAspectRatio=True, mask="auto")
-    text(c, code, x, y - 3.2 * mm, 5.6, color=SOFT)
 
 
-def blank_head(c, x, y, title, kind_label, code):
-    pad = 3.0 * mm
+def swiss_head(c, x, y, title, sub, code, kind_no):
+    pad = 4.0 * mm
     top = y + CARD_H - pad
-    xxy(c, x + pad, top - 4.4 * mm, 11)
-    tiny(c, "TASK CARD / XXY-01", x + pad + 20 * mm, top - 1.6 * mm, 3.2, SOFT)
-    text(c, title, x + pad + 20 * mm, top - 4.6 * mm, 5.4, color=SOFT)
-    tiny(c, "SHORT 1:8 A4" if kind_label == "短期" else "LONG 1:8 A4",
-         x + CARD_W - pad, top - 1.6 * mm, 3.2, SOFT, "r")
-    laser_band(c, x + pad, y + CARD_H - 2.2 * mm, CARD_W - 2 * pad, 1.0 * mm)
+    # 顶部小字行
+    track_text(c, "TASK CARD", x + pad, top - 3.0 * mm, 4.2, SWISS_INK, 1.4)
+    track_text(c, sub, x + pad + 22 * mm, top - 3.0 * mm, 4.2, SOFT, 1.0)
+    track_text(c, kind_no, x + CARD_W - pad - 22 * mm, top - 3.0 * mm, 4.2, SOFT, 1.0)
+    # 标题 + 红色方块
+    c.setFont(FONT_B, 13.0)
+    c.setFillColor(SWISS_INK)
+    c.drawString(x + pad, top - 9.6 * mm, title)
+    c.setFillColor(SWISS_RED)
+    c.rect(x + pad + 17.5 * mm, top - 9.2 * mm, 3.0 * mm, 3.0 * mm, stroke=0, fill=1)
+    # 顶部分隔粗线（只到二维码左侧，避免压住虚线）
+    c.setStrokeColor(SWISS_INK)
+    c.setLineWidth(0.7)
+    c.line(x + pad, top - 12.6 * mm, x + CARD_W - pad - 19 * mm, top - 12.6 * mm)
 
 
-def blank_footer(c, x, y, code):
-    pad = 3.0 * mm
-    barcode(c, x + pad, y + 2.2 * mm, 34 * mm, 3.4 * mm, code)
-    signal(c, x + pad + 36 * mm, y + 2.2 * mm, 16, 1.15 * mm, 4.6 * mm, sum(ord(ch) for ch in code))
-    tiny(c, serial(code), x + CARD_W - pad, y + 2.6 * mm, 2.8, SOFT, "r")
+def swiss_footer(c, x, y, code):
+    pad = 4.0 * mm
+    c.setStrokeColor(SWISS_INK)
+    c.setLineWidth(0.35)
+    c.line(x + pad, y + 5.6 * mm, x + CARD_W - pad, y + 5.6 * mm)
+    c.setFillColor(SWISS_RED)
+    c.rect(x + pad, y + 3.2 * mm, 2.0 * mm, 2.0 * mm, stroke=0, fill=1)
+    track_text(c, "SCAN · UPDATE", x + pad + 4.4 * mm, y + 3.5 * mm, 3.6, SOFT, 0.8)
+    c.setFont("Helvetica", 3.6)
+    c.setFillColor(SOFT)
+    c.drawRightString(x + CARD_W - pad, y + 3.5 * mm, f"TC {code} / 001")
 
 
 def draw_blank_short(c, x, y, code, url):
-    pad = 3.0 * mm
+    pad = 4.0 * mm
     qsize = 16.5 * mm
-    right_w = CARD_W - 2 * pad - qsize - 2.5 * mm
     qx = x + CARD_W - pad - qsize
-    qy = y + CARD_H - 7 * mm - qsize
-    corners(c, x, y)
+    qy = y + CARD_H - 4.0 * mm - qsize
 
-    blank_head(c, x, y, "任务卡", "短期", code)
     draw_qr_compact(c, qx, qy, url, code, 16.5)
+    swiss_head(c, x, y, "任务卡", "SHORT · 1/8 A4", code, "01")
 
-    # 任务名称
-    label(c, "任务名称", x + pad, y + CARD_H - 12.6 * mm)
-    rule(c, x + pad, x + pad + right_w, y + CARD_H - 17.4 * mm, 0.5)
-    rule(c, x + pad, x + pad + right_w, y + CARD_H - 22.0 * mm, 0.5)
+    left_w = CARD_W - 2 * pad - qsize - 4 * mm
+
+    # 任务名称（两行，第一行在二维码下方）
+    ty = y + CARD_H - 19.4 * mm
+    label(c, "任务名称", x + pad, ty)
+    rule(c, x + pad, x + pad + CARD_W - 2 * pad, ty - 4.4 * mm, 0.45, SWISS_INK)
+    rule(c, x + pad, x + pad + CARD_W - 2 * pad, ty - 7.8 * mm, 0.3)
 
     # 优先级
-    py = y + CARD_H - 27.6 * mm
+    py = y + CARD_H - 32.0 * mm
     label(c, "优先级", x + pad, py)
-    chips(c, x + pad + 11 * mm, py, ("重要且紧急", "重要不紧急", "紧急不重要", "其他"), 4.8, 2.4 * mm)
+    chips(c, x + pad + 12 * mm, py, ("重要且紧急", "重要不紧急", "紧急不重要", "其他"), 4.8, 2.2 * mm)
 
     # 开始 / 截止
-    ry = y + CARD_H - 33.4 * mm
+    ry = y + CARD_H - 37.4 * mm
     label(c, "开始", x + pad, ry)
-    rule(c, x + pad + 8.5 * mm, x + pad + 32 * mm, ry - 0.7 * mm)
-    label(c, "截止", x + pad + 38 * mm, ry)
-    rule(c, x + pad + 46.5 * mm, x + pad + 70 * mm, ry - 0.7 * mm)
+    rule(c, x + pad + 9 * mm, x + pad + 34 * mm, ry - 0.6 * mm, 0.3)
+    label(c, "截止", x + pad + 40 * mm, ry)
+    rule(c, x + pad + 49 * mm, x + pad + 74 * mm, ry - 0.6 * mm, 0.3)
 
-    # 完成标准（两行）
-    dy = y + CARD_H - 39.0 * mm
+    # 完成标准
+    dy = y + CARD_H - 42.8 * mm
     label(c, "完成标准", x + pad, dy)
-    rule(c, x + pad + 14 * mm, x + CARD_W - pad, dy - 0.7 * mm, 0.4)
-    rule(c, x + pad, x + CARD_W - pad, dy - 6.2 * mm, 0.35)
+    rule(c, x + pad + 16 * mm, x + CARD_W - pad, dy - 0.6 * mm, 0.3)
+    rule(c, x + pad, x + CARD_W - pad, dy - 5.0 * mm, 0.3)
 
     # 材料 / 备注
     label(c, "材料", x + pad, y + CARD_H - 52.6 * mm)
-    rule(c, x + pad + 8.5 * mm, x + CARD_W - pad, y + CARD_H - 53.2 * mm)
-    label(c, "备注", x + pad, y + CARD_H - 57.8 * mm)
-    rule(c, x + pad + 8.5 * mm, x + CARD_W - pad, y + CARD_H - 58.4 * mm)
+    rule(c, x + pad + 9 * mm, x + CARD_W - pad, y + CARD_H - 53.2 * mm, 0.3)
+    label(c, "备注", x + pad, y + CARD_H - 57.6 * mm)
+    rule(c, x + pad + 9 * mm, x + CARD_W - pad, y + CARD_H - 58.2 * mm, 0.3)
 
     # 任务状态
-    sy = y + CARD_H - 63.6 * mm
+    sy = y + CARD_H - 62.6 * mm
     label(c, "任务状态", x + pad, sy)
-    chips(c, x + pad + 14 * mm, sy, ("待办", "进行中", "完成", "搁置"), 5.0, 3.4 * mm)
+    chips(c, x + pad + 15 * mm, sy, ("待办", "进行中", "完成", "搁置"), 5.0, 3.2 * mm)
 
-    blank_footer(c, x, y, code)
+    swiss_footer(c, x, y, code)
 
 
 def draw_blank_long(c, x, y, code, url):
-    pad = 3.0 * mm
+    pad = 4.0 * mm
     qsize = 16.5 * mm
-    right_w = CARD_W - 2 * pad - qsize - 2.5 * mm
     qx = x + CARD_W - pad - qsize
-    qy = y + CARD_H - 7 * mm - qsize
-    corners(c, x, y)
+    qy = y + CARD_H - 4.0 * mm - qsize
 
-    blank_head(c, x, y, "目标卡", "长期", code)
     draw_qr_compact(c, qx, qy, url, code, 16.5)
+    swiss_head(c, x, y, "目标卡", "LONG · 1/8 A4", code, "01")
 
-    # 任务名称
-    label(c, "任务名称", x + pad, y + CARD_H - 12.6 * mm)
-    rule(c, x + pad, x + pad + right_w, y + CARD_H - 17.4 * mm, 0.5)
-    rule(c, x + pad, x + pad + right_w, y + CARD_H - 21.6 * mm, 0.5)
+    left_w = CARD_W - 2 * pad - qsize - 4 * mm
+
+    ty = y + CARD_H - 19.4 * mm
+    label(c, "任务名称", x + pad, ty)
+    rule(c, x + pad, x + pad + CARD_W - 2 * pad, ty - 4.4 * mm, 0.45, SWISS_INK)
+    rule(c, x + pad, x + pad + CARD_W - 2 * pad, ty - 7.8 * mm, 0.3)
 
     # 目标
-    label(c, "目标", x + pad, y + CARD_H - 27.0 * mm)
-    rule(c, x + pad, x + CARD_W - pad, y + CARD_H - 31.6 * mm, 0.5)
-    rule(c, x + pad, x + CARD_W - pad, y + CARD_H - 35.6 * mm, 0.4)
+    gy = y + CARD_H - 31.6 * mm
+    label(c, "目标", x + pad, gy)
+    rule(c, x + pad, x + CARD_W - pad, gy - 4.2 * mm, 0.4, SWISS_INK)
+    rule(c, x + pad, x + CARD_W - pad, gy - 7.6 * mm, 0.3)
 
     # 周期
-    cy = y + CARD_H - 40.8 * mm
+    cy = y + CARD_H - 43.4 * mm
     label(c, "周期", x + pad, cy)
-    label(c, "起", x + pad + 8 * mm, cy, 4.8)
-    rule(c, x + pad + 11 * mm, x + pad + 26 * mm, cy - 0.7 * mm)
-    label(c, "止", x + pad + 29 * mm, cy, 4.8)
-    rule(c, x + pad + 32 * mm, x + pad + 47 * mm, cy - 0.7 * mm)
+    track_text(c, "FROM", x + pad + 10 * mm, cy, 3.8, SOFT, 0.8)
+    rule(c, x + pad + 18 * mm, x + pad + 33 * mm, cy - 0.6 * mm, 0.3)
+    track_text(c, "TO", x + pad + 37 * mm, cy, 3.8, SOFT, 0.8)
+    rule(c, x + pad + 42 * mm, x + pad + 57 * mm, cy - 0.6 * mm, 0.3)
 
     # 周投入
-    wy = y + CARD_H - 46.2 * mm
+    wy = y + CARD_H - 48.2 * mm
     label(c, "周投入", x + pad, wy)
-    rule(c, x + pad + 12 * mm, x + pad + 24 * mm, wy - 0.7 * mm)
-    label(c, "小时 / 周", x + pad + 25 * mm, wy, 4.8)
+    rule(c, x + pad + 12 * mm, x + pad + 22 * mm, wy - 0.6 * mm, 0.3)
+    track_text(c, "H / WEEK", x + pad + 24 * mm, wy, 3.8, SOFT, 0.8)
 
     # 状态
-    sy = y + CARD_H - 51.4 * mm
+    sy = y + CARD_H - 53.0 * mm
     label(c, "任务状态", x + pad, sy)
-    chips(c, x + pad + 14 * mm, sy, ("待办", "进行中", "完成", "搁置"), 5.0, 3.4 * mm)
+    chips(c, x + pad + 15 * mm, sy, ("待办", "进行中", "完成", "搁置"), 5.0, 3.2 * mm)
 
     # 短期里程碑（3 条）
-    label(c, "短期里程碑", x + pad, y + CARD_H - 56.6 * mm)
+    label(c, "短期里程碑", x + pad, y + CARD_H - 58.0 * mm)
     for i in range(3):
-        my = y + CARD_H - (60.6 + i * 3.2) * mm
+        my = y + CARD_H - (61.6 + i * 2.7) * mm
         bx = small_box(c, x + pad, my)
-        rule(c, bx + 0.6 * mm, x + CARD_W - pad, my - 0.7 * mm, 0.35)
+        rule(c, bx + 0.6 * mm, x + CARD_W - pad, my - 0.6 * mm, 0.3)
 
-    blank_footer(c, x, y, code)
+    swiss_footer(c, x, y, code)
 
 
 def draw_blank_back(c, x, y, code):
-    pad = 3.0 * mm
-    corners(c, x, y)
+    pad = 4.0 * mm
     top = y + CARD_H - pad
 
-    # 大 XXY 水印（浅灰，当印刷纹理用）+ 复盘标题
-    xxy(c, x + 8 * mm, y + 9.5 * mm, 30, color=HexColor("#e6e6e6"))
-    xxy(c, x + pad, top - 4.6 * mm, 11)
-    text(c, "复盘卡", x + pad + 20 * mm, top - 4.8 * mm, 5.4, color=SOFT)
-    tiny(c, "REVIEW / " + serial(code), x + CARD_W - pad, top - 1.8 * mm, 3.2, SOFT, "r")
+    track_text(c, "REVIEW", x + pad, top - 3.0 * mm, 4.2, SWISS_INK, 1.4)
+    track_text(c, "BACK · 1/8 A4", x + pad + 20 * mm, top - 3.0 * mm, 4.2, SOFT, 1.0)
+    track_text(c, "02", x + CARD_W - pad, top - 3.0 * mm, 4.2, SOFT, 1.0)
+
+    c.setFont(FONT_B, 13.0)
+    c.setFillColor(SWISS_INK)
+    c.drawString(x + pad, top - 9.6 * mm, "复盘卡")
+    c.setFillColor(SWISS_RED)
+    c.rect(x + pad + 17.5 * mm, top - 9.2 * mm, 3.0 * mm, 3.0 * mm, stroke=0, fill=1)
+    c.setStrokeColor(SWISS_INK)
+    c.setLineWidth(0.7)
+    c.line(x + pad, top - 12.6 * mm, x + CARD_W - pad, top - 12.6 * mm)
 
     # 实际用时 / 完成日期
-    ry = y + CARD_H - 12.4 * mm
+    ry = y + CARD_H - 19.8 * mm
     label(c, "实际用时", x + pad, ry)
-    rule(c, x + pad + 15 * mm, x + pad + 32 * mm, ry - 0.7 * mm)
-    label(c, "完成日期", x + pad + 38 * mm, ry)
-    rule(c, x + pad + 53 * mm, x + pad + 72 * mm, ry - 0.7 * mm)
+    rule(c, x + pad + 15 * mm, x + pad + 33 * mm, ry - 0.6 * mm, 0.3)
+    label(c, "完成日期", x + pad + 39 * mm, ry)
+    rule(c, x + pad + 54 * mm, x + pad + 74 * mm, ry - 0.6 * mm, 0.3)
 
     # 三行复盘
-    body = y + CARD_H - 20.2 * mm
+    body = y + CARD_H - 28.6 * mm
     for lab in ("做成了什么", "卡在哪 / 为什么", "下次怎么改"):
         label(c, lab, x + pad, body)
-        rule(c, x + pad + 22 * mm, x + CARD_W - pad, body - 0.7 * mm, 0.35)
-        rule(c, x + pad, x + CARD_W - pad, body - 6.4 * mm, 0.3)
-        body -= 11.4 * mm
+        rule(c, x + pad + 22 * mm, x + CARD_W - pad, body - 0.6 * mm, 0.3)
+        rule(c, x + pad, x + CARD_W - pad, body - 7.4 * mm, 0.3)
+        body -= 13.2 * mm
 
-    # 装饰
-    barcode(c, x + pad, y + 2.4 * mm, 40 * mm, 3.4 * mm, code)
-    signal(c, x + pad + 42 * mm, y + 2.4 * mm, 14, 1.2 * mm, 4.6 * mm, abs(hash(code)) % 997)
-    tiny(c, serial(code), x + CARD_W - pad, y + 2.8 * mm, 2.8, SOFT, "r")
+    swiss_footer(c, x, y, code)
 
 
 def draw_back(c, x, y, t, url):

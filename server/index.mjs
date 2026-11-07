@@ -600,19 +600,34 @@ app.post('/ds-api/cards.pdf', async (req, res) => {
 // 打印空白表：先建 N 张占位卡（draft，不在看板出现）+ 短码，再出空白版式 PDF
 // 作废一张纸卡：码还在，但扫到会显示「已作废」，不再能写回
 app.post('/ds-api/cards.revoke', async (req, res) => {
-  const code = String(req.body?.code || '').trim();
-  if (!code) return res.status(400).json({ ok: false, error: '要指定短码' });
-  const lq = await pbReq(
-    `/api/collections/short_links/records?perPage=1&filter=${encodeURIComponent(`code="${code}"`)}`,
-  );
-  const link = lq.json?.items?.[0];
-  if (!link) return res.status(404).json({ ok: false, error: `短码 ${code} 不在系统里` });
-  const r = await pbReq(`/api/collections/short_links/records/${link.id}`, {
-    method: 'PATCH',
-    body: { active: false },
-  });
-  if (!r.ok) return res.status(500).json({ ok: false, error: r.json?.message || '作废失败' });
-  res.json({ ok: true, code });
+  const one = String(req.body?.code || '').trim();
+  const many = Array.isArray(req.body?.codes) ? req.body.codes.map((c) => String(c).trim()) : [];
+  const codes = [...new Set([...(one ? [one] : []), ...many])].filter(Boolean);
+  if (!codes.length) return res.status(400).json({ ok: false, error: '要指定短码' });
+  if (codes.length > 200) return res.status(400).json({ ok: false, error: '一次最多作废 200 张' });
+
+  const done = [];
+  const failed = [];
+  for (const code of codes) {
+    const lq = await pbReq(
+      `/api/collections/short_links/records?perPage=1&filter=${encodeURIComponent(`code="${code}"`)}`,
+    );
+    const link = lq.json?.items?.[0];
+    if (!link) {
+      failed.push({ code, error: '不在系统里' });
+      continue;
+    }
+    const r = await pbReq(`/api/collections/short_links/records/${link.id}`, {
+      method: 'PATCH',
+      body: { active: false },
+    });
+    if (!r.ok) failed.push({ code, error: r.json?.message || '作废失败' });
+    else done.push(code);
+  }
+  if (!done.length) {
+    return res.status(404).json({ ok: false, error: '一张都没作废成功', failed });
+  }
+  res.json({ ok: true, revoked: done.length, codes: done, failed });
 });
 
 // 补印：按原来的短码重新出空白卡（码不变，纸换了）；可以一次补一批

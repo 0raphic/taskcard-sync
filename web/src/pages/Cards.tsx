@@ -117,6 +117,29 @@ export function Cards() {
     }
   }
 
+  async function revokeMany(codes: string[]) {
+    if (!codes.length) return;
+    const ok = window.confirm(`作废 ${codes.length} 张卡？作废后扫这些纸只会提示「已作废」，不能再写回。`);
+    if (!ok) return;
+    setBusy(`revoke:${codes.join(',')}`);
+    setFlash(null);
+    try {
+      const res = await fetch('/ds-api/cards.revoke', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ codes }),
+      });
+      const b = (await res.json()) as { ok?: boolean; revoked?: number; error?: string; failed?: { code: string }[] };
+      if (!res.ok || !b.ok) throw new Error(b.error || `HTTP ${res.status}`);
+      setFlash(`作废 ${b.revoked ?? codes.length} 张${b.failed?.length ? `，${b.failed.length} 张没成功` : ''}，纸留着当便签就行`);
+      setPicked([]);
+    } catch (e) {
+      setFlash(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function reprint(codes: string[], fill = false) {
     setBusy(`reprint:${codes.join(',')}`);
     setFlash(null);
@@ -183,6 +206,14 @@ export function Cards() {
               >
                 补印选中的 {picked.length} 张
               </button>
+              <button
+                type="button"
+                onClick={() => revokeMany(picked)}
+                disabled={busy !== null}
+                className="border border-seal/40 px-3 py-2 text-[12px] text-seal hover:border-seal/70 disabled:opacity-50"
+              >
+                作废选中的 {picked.length} 张
+              </button>
             </>
           )}
           {batch.length > 0 && (
@@ -227,6 +258,20 @@ export function Cards() {
             {shown.length > 0 && shown.filter((r) => r.active !== false).every((r) => picked.includes(r.code))
               ? '取消选择本组'
               : `选择本组（${shown.filter((r) => r.active !== false).length}）`}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const all = (rows ?? []).filter((r) => r.active !== false).map((r) => r.code);
+              const allPicked = all.length > 0 && all.every((c) => picked.includes(c));
+              setPicked(allPicked ? [] : all);
+            }}
+            className="text-[11px] text-oncanvas/45 hover:text-oncanvas/80"
+          >
+            {(rows ?? []).filter((r) => r.active !== false).every((r) => picked.includes(r.code)) &&
+            (rows ?? []).some((r) => r.active !== false)
+              ? '取消全选'
+              : `全选（${(rows ?? []).filter((r) => r.active !== false).length}）`}
           </button>
           {picked.length > 0 && (
             <button type="button" onClick={() => setPicked([])} className="text-[11px] text-oncanvas/45 hover:text-oncanvas/80">
