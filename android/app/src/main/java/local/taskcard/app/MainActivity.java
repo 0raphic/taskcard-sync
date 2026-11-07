@@ -156,7 +156,7 @@ public class MainActivity extends Activity {
     }
 
     private void showMenu() {
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
                 .setItems(new String[]{"刷新", "服务器地址", "用浏览器打开"}, (d, which) -> {
                     if (which == 0) {
                         load(currentBase());
@@ -173,7 +173,7 @@ public class MainActivity extends Activity {
     }
 
     private void showUnreachable() {
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
                 .setTitle("打不开")
                 .setMessage("手机和电脑要连同一个 Wi-Fi。\n\n电脑上那个窗口不能关（它就是服务器），\n地址以窗口里打印的「手机打开」为准。")
                 .setPositiveButton("重试", (d, w) -> load(currentBase()))
@@ -193,7 +193,7 @@ public class MainActivity extends Activity {
         input.setSelectAllOnFocus(true);
         input.setTextColor(Color.parseColor("#17181A"));
 
-        new AlertDialog.Builder(this)
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
                 .setTitle(first ? "第一步：连上电脑" : "服务器地址")
                 .setMessage("填电脑窗口里「手机打开」后面的地址，例如 http://192.168.0.108:8088")
                 .setView(input)
@@ -210,7 +210,30 @@ public class MainActivity extends Activity {
                 })
                 .setNegativeButton("取消", null)
                 .setCancelable(!first)
-                .show();
+                .create();
+        final AlertDialog shown = new AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
+                .setTitle(first ? "第一步：连上电脑" : "服务器地址")
+                .setMessage("填电脑窗口里「手机打开」后面的地址，例如 http://192.168.0.108:8088")
+                .setView(input)
+                .setPositiveButton("打开", (d, w) -> {
+                    String u = input.getText().toString().trim();
+                    if (u.isEmpty()) {
+                        return;
+                    }
+                    if (!u.startsWith("http://") && !u.startsWith("https://")) {
+                        u = "http://" + u;
+                    }
+                    prefs.edit().putString("base", u).apply();
+                    load(u);
+                })
+                .setNegativeButton("取消", null)
+                .setCancelable(!first)
+                .create();
+        shown.setOnShowListener(x -> {
+            shown.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor("#D6362B"));
+            shown.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.parseColor("#5A5A5A"));
+        });
+        shown.show();
     }
 
     @Override
