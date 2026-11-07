@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createTask } from '../lib/data';
+import { canUseInPageCamera, fileToJpegDataUrl } from '../lib/image';
 import { pb } from '../lib/pb';
 import { navigate } from '../lib/router';
 import { STATUS_LABEL, type Kind, type Status } from '../lib/types';
@@ -49,6 +50,9 @@ export function Capture() {
   const [flash, setFlash] = useState<string | null>(null);
   const [raw, setRaw] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef2 = useRef<HTMLInputElement>(null);
+  const [shotOpen, setShotOpen] = useState(false);
+  const inPageCam = canUseInPageCamera();
 
   async function structure() {
     if (!text.trim()) return;
@@ -77,17 +81,13 @@ export function Capture() {
     }
   }
 
-  async function fromImage(file: File) {
+  async function fromImage(file: File | Blob) {
     setBusy(true);
-    setFlash(null);
+    setFlash('照片处理中…');
     setRaw(null);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
+      const dataUrl = await fileToJpegDataUrl(file);
+      setFlash('识别中…');
       const res = await fetch('/ds-api/ocr', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -111,6 +111,7 @@ export function Capture() {
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = '';
+      if (fileRef2.current) fileRef2.current.value = '';
     }
   }
 
@@ -174,7 +175,7 @@ export function Capture() {
         </button>
 
         <label className="cursor-pointer border border-paper/20 px-3 py-2.5 text-[12px] text-paper/70 hover:border-paper/40">
-          上传照片识别
+          拍照识别
           <input
             ref={fileRef}
             type="file"
@@ -188,8 +189,42 @@ export function Capture() {
           />
         </label>
 
+        <label className="cursor-pointer border border-paper/20 px-3 py-2.5 text-[12px] text-paper/70 hover:border-paper/40">
+          从相册
+          <input
+            ref={fileRef2}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void fromImage(f);
+            }}
+          />
+        </label>
+
+        {inPageCam && (
+          <button
+            type="button"
+            onClick={() => setShotOpen(true)}
+            className="border border-paper/20 px-3 py-2.5 text-[12px] text-paper/70 hover:border-paper/40"
+          >
+            页内拍照
+          </button>
+        )}
+
         {flash && <span className="text-[12px] text-paper/50">{flash}</span>}
       </div>
+
+      {shotOpen && (
+        <CameraShot
+          onClose={() => setShotOpen(false)}
+          onShot={(blob) => {
+            setShotOpen(false);
+            void fromImage(blob);
+          }}
+        />
+      )}
 
       {raw && (
         <details className="border border-paper/15 px-3 py-2 text-[12px] text-paper/60">
@@ -321,4 +356,77 @@ function shortCode(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   for (const b of bytes) out += ALPHABET[b % ALPHABET.length];
   return out;
+}
+
+/** 只在 https / localhost 下出现：局域网 http 调不了 getUserMedia，所以主路径仍是 input[capture] */
+function CameraShot({
+  onClose,
+  onShot,
+}: {
+  onClose: () => void;
+  onShot: (blob: Blob) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      .then((stream) => {
+        if (!alive) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          void videoRef.current.play();
+        }
+      })
+      .catch(() => setError('这个浏览器不给用摄像头，退回「拍照识别」试试'));
+    return () => {
+      alive = false;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  async function shoot() {
+    const v = videoRef.current;
+    if (!v) return;
+    const scale = Math.min(1, 1600 / Math.max(v.videoWidth || 1, v.videoHeight || 1));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(v.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(v.videoHeight * scale));
+    canvas.getContext('2d')?.drawImage(v, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', 0.85));
+    if (blob) onShot(blob);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/85 p-4 backdrop-blur-sm">
+      <div className="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-3">
+        <div className="flex items-center justify-between text-[12px] text-paper/60">
+          <span>对准纸卡</span>
+          <button type="button" onClick={onClose} className="border border-paper/25 px-3 py-1.5">
+            取消
+          </button>
+        </div>
+        {error ? (
+          <p className="text-[13px] text-amber">{error}</p>
+        ) : (
+          <video ref={videoRef} playsInline muted className="min-h-0 flex-1 bg-black object-contain" />
+        )}
+        {!error && (
+          <button
+            type="button"
+            onClick={shoot}
+            className="mx-auto mb-2 h-14 w-14 rounded-full border-4 border-white/70 bg-white/20"
+            aria-label="拍下这张卡"
+          />
+        )}
+      </div>
+    </div>
+  );
 }

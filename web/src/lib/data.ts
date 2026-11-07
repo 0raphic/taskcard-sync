@@ -47,6 +47,7 @@ export function useShortLink(code: string | undefined) {
     link?: ShortLink;
     task?: Task;
     error?: string;
+    notFound?: boolean;
   }>({ loading: true });
 
   useEffect(() => {
@@ -55,12 +56,14 @@ export function useShortLink(code: string | undefined) {
       return;
     }
     let alive = true;
+    let linkFound = false;
     let unsubTask: (() => void) | undefined;
     setState({ loading: true });
 
     pb.collection('short_links')
       .getFirstListItem<ShortLink>(`code="${code}"`, { expand: 'task' })
       .then(async (link) => {
+        linkFound = true;
         // 顺手记一次扫码，失败不影响主流程
         pb.collection('short_links')
           .update(link.id, { scans: (link.scans ?? 0) + 1 })
@@ -75,7 +78,11 @@ export function useShortLink(code: string | undefined) {
         if (alive) {
           pb.collection('tasks')
             .subscribe<Task>(task.id, (e) => {
-              if (e.action !== 'delete') setState((s) => ({ ...s, task: e.record }));
+              if (e.action === 'delete') {
+                setState({ loading: false, notFound: true, error: '这张卡已经不在系统里了' });
+              } else {
+                setState((s) => ({ ...s, task: e.record }));
+              }
             })
             .then((fn) => {
               if (alive) unsubTask = fn;
@@ -85,7 +92,16 @@ export function useShortLink(code: string | undefined) {
         }
       })
       .catch((e: unknown) => {
-        if (alive) setState({ loading: false, error: message(e) });
+        const status = (e as { status?: number })?.status;
+        // 短码本身找不到 = 印错了；短码还在但任务没了 = 被删了
+        const deleted = status === 404 && linkFound;
+        if (alive) {
+          setState({
+            loading: false,
+            notFound: deleted,
+            error: deleted ? '这张卡已经不在系统里了' : status === 404 ? '这个短码不存在，检查一下卡片上的码' : message(e),
+          });
+        }
       });
 
     return () => {
@@ -151,6 +167,18 @@ export async function logProgress(taskId: string, note: string, delta = 0) {
     delta,
     at: new Date().toISOString(),
   });
+}
+
+/** 删除任务：服务端会连带清掉短链和进展记录（PB 关系不级联） */
+export async function deleteTask(id: string) {
+  const res = await fetch(`/ds-api/tasks/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const body = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    deleted?: { links: number; logs: number };
+  };
+  if (!res.ok || !body.ok) throw new Error(body.error || `删除失败 HTTP ${res.status}`);
+  return body.deleted ?? { links: 0, logs: 0 };
 }
 
 export function message(e: unknown): string {

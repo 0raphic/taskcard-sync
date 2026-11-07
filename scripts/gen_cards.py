@@ -256,7 +256,11 @@ def main() -> None:
     global FONT, FONT_B
     FONT, FONT_B = register_fonts()
 
-    data = json.loads(Path(args.input).read_text(encoding="utf-8"))
+    if args.input == "-":
+        # 服务端打印流程：JSON 从 stdin 进来，不用落输入文件
+        data = json.loads(sys.stdin.read())
+    else:
+        data = json.loads(Path(args.input).read_text(encoding="utf-8"))
     tasks = data["tasks"]
     if args.sample:
         tasks = tasks[: args.sample]
@@ -298,11 +302,13 @@ def main() -> None:
 
     c.save()
 
-    Path(args.codes_out).write_text(
-        json.dumps({"base_url": base_url, "codes": codes}, ensure_ascii=False, indent=2),
-        encoding="utf-8")
+    if args.codes_out:
+        Path(args.codes_out).write_text(
+            json.dumps({"base_url": base_url, "codes": codes}, ensure_ascii=False, indent=2),
+            encoding="utf-8")
     print(f"[ok] 生成 {out}，共 {len(codes)} 张卡")
-    print(f"[ok] 短码映射写入 {args.codes_out}")
+    if args.codes_out:
+        print(f"[ok] 短码映射写入 {args.codes_out}")
     print(f"[ok] 二维码指向 {base_url}/t/{{code}}")
 
 

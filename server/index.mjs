@@ -2,7 +2,10 @@ import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import os from 'node:os';
 import path from 'node:path';
 import dotenv from 'dotenv';
 
@@ -321,6 +324,217 @@ app.post('/ds-api/settings', async (req, res) => {
     res.json({ ok: true, configured: Boolean(cfg.key), model: cfg.model, vision: cfg.vision });
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── 局域网地址：印卡片时二维码要指向手机能打开的地址 ───────────────
+function lanIp() {
+  const nets = os.networkInterfaces();
+  const cands = [];
+  for (const [name, list] of Object.entries(nets)) {
+    for (const n of list || []) {
+      if (n.family !== 'IPv4' || n.internal) continue;
+      if (n.address.startsWith('169.254.')) continue;
+      let score = 0;
+      if (/wi-?fi|wlan|ethernet|以太网|无线/i.test(name)) score += 2;
+      if (n.address.startsWith('192.168.')) score += 4;
+      else if (n.address.startsWith('10.')) score += 3;
+      else if (/^172\.(1[6-9]|2\d|3[01])\./.test(n.address)) score += 3;
+      else score -= 2;
+      cands.push({ address: n.address, score });
+    }
+  }
+  cands.sort((a, b) => b.score - a.score);
+  return cands[0]?.address || '127.0.0.1';
+}
+
+const PYTHON = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+const CODE_ALPHABET = '23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+
+async function pbReq(pathname, { method = 'GET', body } = {}) {
+  const token = await adminToken();
+  const r = await fetch(`${PB_URL}${pathname}`, {
+    method,
+    headers: { authorization: token, ...(body ? { 'content-type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await r.text();
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    // 非 JSON 响应，保留 text 给调用方判断
+  }
+  return { ok: r.ok, status: r.status, json, text };
+}
+
+/** 6 位短码（字符集和前端一致），撞了就重抽 */
+async function uniqueCode() {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    let out = '';
+    for (const b of randomBytes(6)) out += CODE_ALPHABET[b % CODE_ALPHABET.length];
+    const r = await pbReq(
+      `/api/collections/short_links/records?perPage=1&filter=${encodeURIComponent(`code="${out}"`)}`,
+    );
+    if (r.ok && !r.json?.items?.length) return out;
+  }
+  throw new Error('短码生成失败，再试一次');
+}
+
+app.get('/ds-api/net', (_req, res) => {
+  const ip = lanIp();
+  res.json({ ok: true, ip, port: PORT, lan: ip !== '127.0.0.1', url: `http://${ip}:${PORT}` });
+});
+
+// 删除任务：PB 关系不级联，这里显式清掉短链和进展记录，否则落地页会 500
+app.delete('/ds-api/tasks/:id', async (req, res) => {
+  const id = req.params.id;
+  try {
+    const one = await pbReq(`/api/collections/tasks/records/${id}`);
+    if (!one.ok) return res.status(404).json({ ok: false, error: '这张卡已经不在了' });
+
+    let links = 0;
+    let logs = 0;
+    const lq = await pbReq(
+      `/api/collections/short_links/records?perPage=200&filter=${encodeURIComponent(`task="${id}"`)}`,
+    );
+    for (const row of lq.json?.items || []) {
+      const r = await pbReq(`/api/collections/short_links/records/${row.id}`, { method: 'DELETE' });
+      if (r.ok) links += 1;
+    }
+    const gq = await pbReq(
+      `/api/collections/progress_logs/records?perPage=200&filter=${encodeURIComponent(`task="${id}"`)}`,
+    );
+    for (const row of gq.json?.items || []) {
+      const r = await pbReq(`/api/collections/progress_logs/records/${row.id}`, { method: 'DELETE' });
+      if (r.ok) logs += 1;
+    }
+    const del = await pbReq(`/api/collections/tasks/records/${id}`, { method: 'DELETE' });
+    if (!del.ok) return res.status(500).json({ ok: false, error: `删除失败 HTTP ${del.status}` });
+    res.json({ ok: true, deleted: { links, logs } });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// 勾选任务 → 生成 1/8 A4 卡片 PDF（复用 scripts/gen_cards.py 的排版）
+app.post('/ds-api/cards.pdf', async (req, res) => {
+  const body = req.body || {};
+  const ids = Array.isArray(body.ids)
+    ? [...new Set(body.ids.filter((v) => typeof v === 'string' && v.trim()))]
+    : [];
+  if (!ids.length) return res.status(400).json({ ok: false, error: '先选至少一张卡' });
+  if (ids.length > 200) return res.status(400).json({ ok: false, error: '一次最多 200 张，分批打' });
+
+  const baseUrl = String(body.base_url || `http://${lanIp()}:${PORT}`).replace(/\/+$/, '');
+  if (!/^https?:\/\/[^/\s]+$/.test(baseUrl)) {
+    return res.status(400).json({ ok: false, error: '地址要像 http://192.168.0.108:8088' });
+  }
+
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'taskcard-cards-'));
+  try {
+    // 1) 按传入顺序取任务
+    const filter = ids.map((id) => `id="${id}"`).join('||');
+    const q = await pbReq(
+      `/api/collections/tasks/records?perPage=200&filter=${encodeURIComponent(filter)}`,
+    );
+    const found = new Map((q.json?.items || []).map((t) => [t.id, t]));
+    const tasks = ids.map((id) => found.get(id)).filter(Boolean);
+    if (!tasks.length) return res.status(404).json({ ok: false, error: '这些卡都不在了' });
+
+    // 2) 短码：没有的就补一个，保证纸上二维码能扫
+    const lf = tasks.map((t) => `task="${t.id}"`).join('||');
+    const lq = await pbReq(
+      `/api/collections/short_links/records?perPage=200&filter=${encodeURIComponent(lf)}`,
+    );
+    const codes = new Map((lq.json?.items || []).map((l) => [l.task, l.code]));
+    for (const t of tasks) {
+      if (codes.has(t.id)) continue;
+      const code = await uniqueCode();
+      const r = await pbReq('/api/collections/short_links/records', {
+        method: 'POST',
+        body: { code, task: t.id, active: true, scans: 0 },
+      });
+      if (r.ok) codes.set(t.id, code);
+    }
+
+    const payload = {
+      base_url: baseUrl,
+      tasks: tasks.map((t) => ({
+        id: t.id,
+        code: codes.get(t.id),
+        kind: t.kind,
+        title: t.title,
+        due: t.due || '',
+        estimate_min: t.estimate_min ?? 0,
+        description: t.description || '',
+        materials: t.materials || '',
+        notes: t.notes || '',
+        start: t.start || '',
+        goal: t.goal || '',
+        milestones: Array.isArray(t.milestones) ? t.milestones : [],
+        resources: t.materials || '',
+        progress: t.progress ?? 0,
+      })),
+    };
+
+    // 3) 交给 Python 排版
+    const outPdf = path.join(tmp, 'cards.pdf');
+    const args = [
+      path.join(ROOT, 'scripts', 'gen_cards.py'),
+      '--input',
+      '-',
+      '--output',
+      outPdf,
+      '--base-url',
+      baseUrl,
+      '--codes-out',
+      '',
+    ];
+    if (body.double_sided) args.push('--double-sided');
+
+    const result = await new Promise((resolve) => {
+      const child = spawn(PYTHON, args, { cwd: ROOT, windowsHide: true });
+      let err = '';
+      child.stdout.on('data', () => {});
+      child.stderr.on('data', (d) => {
+        err += String(d);
+        if (err.length > 4000) err = err.slice(-4000);
+      });
+      child.on('error', (e) => resolve({ ok: false, code: e.code, err: e.message }));
+      child.on('close', (code) => resolve({ ok: code === 0, code, err }));
+      child.stdin.end(JSON.stringify(payload));
+    });
+
+    if (!result.ok) {
+      if (result.code === 'ENOENT') {
+        return res.status(501).json({
+          ok: false,
+          error: '这台机器没找到 python；装 Python 后跑 pip install reportlab qrcode',
+        });
+      }
+      const tail = String(result.err || '')
+        .trim()
+        .split('\n')
+        .slice(-3)
+        .join(' ');
+      return res.status(502).json({ ok: false, error: `生成失败：${tail}` });
+    }
+
+    const pdf = readFileSync(outPdf);
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    res.setHeader('content-type', 'application/pdf');
+    res.setHeader('content-disposition', `inline; filename="taskcard-${stamp}.pdf"`);
+    res.setHeader('x-card-count', String(payload.tasks.length));
+    res.send(pdf);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  } finally {
+    try {
+      rmSync(tmp, { recursive: true, force: true });
+    } catch {
+      // 临时目录清不掉不影响返回
+    }
   }
 });
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { TaskCard } from '../components/TaskCard';
 import { useTasks } from '../lib/data';
+import { Link } from '../lib/router';
 import { STATUSES, STATUS_LABEL, type Status } from '../lib/types';
 
 type Filter = 'all' | Status | 'long';
@@ -52,7 +53,8 @@ export function TaskList() {
         />
       </header>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1.5">
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -67,6 +69,13 @@ export function TaskList() {
             {f.label}
           </button>
         ))}
+        </div>
+        <Link
+          to={shown.length ? `/print?ids=${shown.map((t) => t.id).join(',')}` : '/print'}
+          className="shrink-0 border border-paper/20 px-3 py-1.5 text-[12px] text-paper/65 hover:border-paper/45"
+        >
+          把这几张排成 A4 →
+        </Link>
       </div>
 
       {error && <p className="text-[12px] text-seal">连不上后端：{error}</p>}

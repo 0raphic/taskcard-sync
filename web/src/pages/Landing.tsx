@@ -5,7 +5,7 @@ import { Link, navigate } from '../lib/router';
 import { STATUS_LABEL, type Status } from '../lib/types';
 
 export function Landing({ code }: { code: string }) {
-  const { loading, task, link, error } = useShortLink(code);
+  const { loading, task, link, error, notFound } = useShortLink(code);
   const update = useUpdateTask();
   const [pending, setPending] = useState<Status | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -60,11 +60,19 @@ export function Landing({ code }: { code: string }) {
 
         {!loading && error && (
           <div className="bg-paper px-6 py-10 text-ink trim">
-            <p className="text-[15px] font-semibold">这张卡没对上号</p>
-            <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">{error}</p>
-            <p className="mt-4 text-[12px] leading-relaxed text-ink-soft">
-              可能原因：短码印错、数据库里还没导入这张卡、或者 PocketBase 没启动。
+            <p className="text-[15px] font-semibold">
+              {notFound ? '这张卡已经不在系统里了' : '这张卡没对上号'}
             </p>
+            <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">
+              {notFound
+                ? '它可能被删掉了，或者换了一版纸卡。手上这张纸可以留着当便签用。'
+                : error}
+            </p>
+            {!notFound && (
+              <p className="mt-4 text-[12px] leading-relaxed text-ink-soft">
+                可能原因：短码印错、数据库里还没导入这张卡、或者 PocketBase 没启动。
+              </p>
+            )}
             <Link
               to="/"
               className="mt-6 inline-block border border-ink/25 px-3 py-2 text-[12px] hover:bg-ink/5"

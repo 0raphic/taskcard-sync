@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { TaskSheet } from '../components/TaskSheet';
-import { logProgress, message, useTask, useUpdateTask } from '../lib/data';
+import { logProgress, message, useTask, useUpdateTask, deleteTask } from '../lib/data';
 import { pb } from '../lib/pb';
-import { Link } from '../lib/router';
+import { Link, navigate } from '../lib/router';
 import {
   STATUSES,
   STATUS_LABEL,
@@ -18,6 +18,8 @@ export function Detail({ id }: { id: string }) {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -68,6 +70,18 @@ export function Detail({ id }: { id: string }) {
       setFlash(message(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function remove() {
+    setDeleting(true);
+    setFlash(null);
+    try {
+      await deleteTask(id);
+      navigate('/tasks');
+    } catch (e) {
+      setFlash(message(e));
+      setDeleting(false);
     }
   }
 
@@ -166,6 +180,47 @@ export function Detail({ id }: { id: string }) {
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+
+          <section className="mt-2 flex flex-col gap-2 border border-seal/25 px-4 py-3">
+            <h2 className="text-[11px] tracking-[0.18em] text-seal/80">删除</h2>
+            {!confirming ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setConfirming(true)}
+                  className="border border-seal/45 px-3 py-2 text-[12px] text-seal/90 hover:border-seal hover:bg-seal/10"
+                >
+                  删除这张任务卡
+                </button>
+                <span className="text-[11px] text-paper/35">删了就找不回来。</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <p className="text-[12px] leading-relaxed text-paper/60">
+                  会一起删掉：短码 <span className="font-mono text-paper/80">{code || '（还没生成）'}</span>、
+                  {logs.length} 条进展记录。已经打印出去的纸卡扫这个码会显示「已经不在系统里」。
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={remove}
+                    disabled={deleting}
+                    className="bg-seal px-4 py-2 text-[12px] font-medium text-white hover:brightness-110 disabled:opacity-50"
+                  >
+                    {deleting ? '删除中…' : '确认删除'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(false)}
+                    disabled={deleting}
+                    className="border border-paper/25 px-4 py-2 text-[12px] text-paper/70 hover:border-paper/45 disabled:opacity-40"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
             )}
           </section>
         </>

@@ -14,6 +14,11 @@
 - 长期卡落地页：现场改进度（−10% / ＋10%）、写一句进展记到详情里
 - 实时同步：A 窗口点「做完了」→ B 窗口看板 1 秒内出现「已完成」分组，不刷新
 - 录入：粘一段文字 → 拆出标题/截止/用时/材料/备注 → 存库并自动生成 6 位短码
+- 拍照录入：手机点「拍照识别」直接调系统相机（局域网 http 也能用），上传前自动缩到长边 1600；
+  https 下还会多一个「页内拍照」
+- 网页里直接拼页打印：`/print` 选卡 → 生成 PDF → 浏览器里直接看/打印（双面可选），
+  二维码里的地址在页面上可改；从「全部任务」可以「把这几张排成 A4」
+- 删除：任务详情页底部 → 连短链和进展记录一起删；已打印的纸卡再扫会显示「这张卡已经不在系统里了」
 - 打印：`cards/cards.pdf` 一页 8 张，二维码实测解码为 `http://192.168.0.108:8088/t/<短码>`
   （IP 变了要重新生成，见下）；`cards/cards-double.pdf` 是双面版
 - PWA：带 manifest 和图标，手机浏览器「添加到主屏幕」后像个 App（没有 Service Worker，离线打不开）
@@ -57,6 +62,11 @@ pnpm build && pnpm start     # → http://127.0.0.1:8088（同时监听局域网
 
 ## 打印纸卡
 
+两种方式，二选一：
+
+1. **网页里点**：`/print` → 勾卡 → 选地址 → 生成 PDF（最省事，不用开终端）
+2. **命令行**（适合批量/换版式）：
+
 ```bash
 python scripts/gen_cards.py --input cards/tasks.json --output cards/cards.pdf \
   --base-url http://192.168.0.108:8088 --codes-out cards/codes.json
@@ -72,6 +82,8 @@ python scripts/gen_cards.py --input cards/tasks.json --output cards/cards.pdf \
   ```
 
 - 输出 `cards/codes.json`：短码 → 任务 ID，和数据库 `short_links` 对应
+- 网页 `/print` 走的是同一个脚本：服务端把选中的卡拼成 JSON 从 stdin 喂进去，临时文件用完即删
+  （这台机器要有 Python + `reportlab` + `qrcode`；没有会返回 501 并提示装包）
 - 打出来先量二维码：不小于 15×15mm；用手机**自带相机**扫，不要用网页里调摄像头
 
 ## 目录
@@ -134,6 +146,10 @@ node tools/build-apk.mjs         # 输出 dist/taskcard.apk
 | 一键启动冷启动 | 通过（换掉两个服务后双击脚本，自动起 PB + 网页并打印地址） |
 | 照片 OCR（配 Key 后） | 通过（一张卡片照片 1.6s 读出标题/截止/用时/材料/备注，存入后生成短码） |
 | 手机 App（模拟器 Android 15） | 通过（装 `dist/taskcard.apk`，填 LAN 地址后加载看板，标题不被状态栏遮挡，⋯ 菜单可刷新/换地址） |
+| 网页拼页 PDF（`/print`） | 通过（9 张 → 1 页 8 张 + 第 2 页 1 张，二维码解码全部指向所选地址；双面 → 页数翻倍，第 2 页起是复盘背面） |
+| 删除级联 | 通过（详情页确认删除 → 任务 404、短链 0、进展 0，页面跳回 `/tasks`；纸卡落地页显示「已经不在系统里了」） |
+| 拍照录入（模拟器塞图） | 通过（`input[type=file]` 选图 → 压到 1600px JPEG → 1.7s 出草稿 → 保存生成短码） |
+| 接口错误码 | 通过（空 ids 400、`ftp://` 400、超 200 张 400、无 Python 501、脚本失败 502） |
 
 ## 现场要点
 
@@ -158,6 +174,8 @@ node tools/build-apk.mjs         # 输出 dist/taskcard.apk
 
 - 冲突用 last-write-wins（`client_updated_at` 记录最后修改时间），不做字段级合并
 - 照片 OCR 依赖视觉模型；本机没装 tesseract，走的是模型读图
+- 删除是硬删除，没有回收站；纸卡上的短码会一起失效
+- 页内拍照（getUserMedia）只在 https / localhost 下出现；局域网 http 用「拍照识别」调系统相机
 - 没有登录：局域网演示用，别放到公网
 - 移动端就是同一套网页；Flutter 客户端只是下一步，不是现在
 - PWA 目前只有 manifest + 图标（能「添加到主屏幕」），没有 Service Worker，断网打不开页面
