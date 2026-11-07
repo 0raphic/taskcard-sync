@@ -1,15 +1,31 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { TaskCard } from '../components/TaskCard';
-import { useTasks } from '../lib/data';
+import { useTasks, useUpdateTask } from '../lib/data';
 import { Link } from '../lib/router';
 import { isDone, isOverdue, isToday, type Task } from '../lib/types';
 
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 
+type Column = {
+  key: 'todo' | 'doing' | 'done';
+  title: string;
+  hint: string;
+  match: (t: Task) => boolean;
+};
+
+const COLUMNS: Column[] = [
+  { key: 'todo', title: '待办', hint: '还没开始 · 或先放着', match: (t) => !isDone(t) && t.status !== 'doing' },
+  { key: 'doing', title: '进行中', hint: '正在做', match: (t) => t.status === 'doing' },
+  { key: 'done', title: '已完成', hint: '收过的卡', match: (t) => isDone(t) },
+];
+
 export function Board() {
   const { tasks, error } = useTasks();
+  const update = useUpdateTask();
   const [printingToday, setPrintingToday] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [overCol, setOverCol] = useState<string | null>(null);
 
   async function printToday(ids: string[]) {
     setPrintingToday(true);
@@ -32,31 +48,41 @@ export function Board() {
       setPrintingToday(false);
     }
   }
+
+  async function drop(status: 'todo' | 'doing' | 'done') {
+    const id = dragging;
+    setDragging(null);
+    setOverCol(null);
+    if (!id) return;
+    const t = (tasks ?? []).find((x) => x.id === id);
+    if (!t || t.status === status) return;
+    try {
+      await update(id, { status });
+    } catch (e) {
+      setFlash(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   // 空白卡是占位记录，内容还没写，不上看板
   const list = (tasks ?? []).filter((t) => !t.draft);
 
   const overdue = list.filter((t) => isOverdue(t));
   const today = list.filter((t) => isToday(t) && !isOverdue(t));
-  const shortRest = list.filter(
-    (t) => t.kind === 'short' && !isOverdue(t) && !isToday(t) && !isDone(t),
-  );
-  const long = list.filter((t) => t.kind === 'long');
-  const done = list.filter((t) => isDone(t));
 
   const now = new Date();
   const dateLabel = `${now.getMonth() + 1} 月 ${now.getDate()} 日 · 周${WEEK[now.getDay()]}`;
 
   return (
-    <div className="flex flex-col gap-7">
+    <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="font-mono text-[11px] tracking-[0.18em] text-oncanvas/40">{dateLabel}</p>
           <h1 className="mt-1 text-[26px] font-semibold leading-tight tracking-tight">
-            今天先做哪张卡？
+            这一周，卡都在哪一格？
           </h1>
         </div>
-        <p className="max-w-[30ch] text-[12px] leading-relaxed text-oncanvas/45">
-          手机扫纸卡右上角的码 → 点一下状态 → 这块屏幕会自己变。不用刷新。
+        <p className="max-w-[34ch] text-[12px] leading-relaxed text-oncanvas/45">
+          三列就是三个阶段。按住卡片拖到另一列，状态就跟着改；手机上手点卡片进详情也能改。
         </p>
       </header>
 
@@ -89,86 +115,93 @@ export function Board() {
       {!tasks && !error && <Skeleton />}
 
       {tasks && (
-        <>
-          <Section title="逾期" tone="seal" tasks={overdue} hint="先处理，或者把截止日改掉">
-            {overdue.slice(0, 8).map((t) => (
-              <TaskCard key={t.id} task={t} />
-            ))}
-          </Section>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {COLUMNS.map((col) => {
+            const items = list.filter(col.match);
+            const isOver = overCol === col.key;
+            return (
+              <section
+                key={col.key}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setOverCol(col.key);
+                }}
+                onDragLeave={() => setOverCol((c) => (c === col.key ? null : c))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  void drop(col.key);
+                }}
+                className={`flex min-h-[320px] flex-col gap-3 border p-3 transition-colors ${
+                  isOver
+                    ? 'border-seal/70 bg-seal/[0.06]'
+                    : 'border-line/15 bg-oncanvas/[0.02]'
+                }`}
+              >
+                <div className="flex items-baseline gap-2">
+                  <span
+                    aria-hidden
+                    className={`h-2 w-2 translate-y-px ${
+                      col.key === 'doing' ? 'bg-seal' : col.key === 'done' ? 'bg-moss' : 'bg-oncanvas/30'
+                    }`}
+                  />
+                  <h2 className="text-[13px] font-medium tracking-[0.14em] text-oncanvas/80">
+                    {col.title}
+                  </h2>
+                  <span className="font-mono text-[11px] text-oncanvas/30">{items.length}</span>
+                  <span className="ml-auto text-[10px] text-oncanvas/25">{col.hint}</span>
+                </div>
 
-          <Section title="今天" tone="amber" tasks={today}>
-            {today.slice(0, 8).map((t) => (
-              <TaskCard key={t.id} task={t} />
-            ))}
-          </Section>
+                <div className="flex flex-col gap-3">
+                  {items.map((t) => (
+                    <div
+                      key={t.id}
+                      draggable
+                      onDragStart={(e) => {
+                        setDragging(t.id);
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', t.id);
+                      }}
+                      onDragEnd={() => {
+                        setDragging(null);
+                        setOverCol(null);
+                      }}
+                      className={dragging === t.id ? 'opacity-40' : ''}
+                    >
+                      <TaskCard task={t} />
+                    </div>
+                  ))}
+                  {items.length === 0 && (
+                    <p className="border border-dashed border-line/20 px-3 py-8 text-center text-[11px] text-oncanvas/25">
+                      把卡拖到这里
+                    </p>
+                  )}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
 
-          <Section title="接下来" tone="plain" tasks={shortRest}>
-            {shortRest.slice(0, 8).map((t) => (
-              <TaskCard key={t.id} task={t} />
-            ))}
-          </Section>
-
-          <Section title="长期目标" tone="plain" tasks={long}>
-            {long.map((t) => (
-              <TaskCard key={t.id} task={t} />
-            ))}
-          </Section>
-
-          {done.length > 0 && (
-            <p className="text-[11px] text-oncanvas/35">
-              已完成 {done.length} 张 ·{' '}
-              <Link to="/tasks" className="underline decoration-paper/30 underline-offset-4">
-                全部任务
-              </Link>
-            </p>
-          )}
-        </>
+      {tasks && (
+        <p className="text-[11px] text-oncanvas/30">
+          看不到「搁置」？它留在待办里，卡片上会标出来 ·{' '}
+          <Link to="/tasks" className="underline decoration-line/30 underline-offset-4">
+            全部任务
+          </Link>
+        </p>
       )}
     </div>
   );
 }
 
-function Section({
-  title,
-  tone,
-  tasks,
-  hint,
-  children,
-}: {
-  title: string;
-  tone: 'seal' | 'amber' | 'plain';
-  tasks: Task[];
-  hint?: string;
-  children: ReactNode;
-}) {
-  if (tasks.length === 0) return null;
-
-  const accent =
-    tone === 'seal' ? 'bg-seal' : tone === 'amber' ? 'bg-amber' : 'bg-oncanvas/25';
-
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-baseline gap-2">
-        <span aria-hidden className={`h-2 w-2 translate-y-px ${accent}`} />
-        <h2 className="text-[13px] font-medium tracking-[0.14em] text-oncanvas/80">{title}</h2>
-        <span className="font-mono text-[11px] text-oncanvas/30">{tasks.length}</span>
-        {hint && <span className="ml-1 text-[11px] text-oncanvas/30">{hint}</span>}
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {children}
-      </div>
-    </section>
-  );
-}
-
 function Skeleton() {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {Array.from({ length: 8 }).map((_, i) => (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
-          className="h-[132px] animate-pulse bg-oncanvas/10"
-          style={{ animationDelay: `${i * 60}ms` }}
+          className="h-[320px] animate-pulse border border-line/10 bg-oncanvas/[0.04]"
+          style={{ animationDelay: `${i * 80}ms` }}
         />
       ))}
     </div>

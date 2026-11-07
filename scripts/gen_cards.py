@@ -312,14 +312,23 @@ def pixels(c, x, y, cols=8, rows=3, step=1.15 * mm, size=0.62 * mm):
                 c.rect(x + ix * step, y + iy * step, size, size, stroke=0, fill=1)
 
 
-def heart(c, x, y, size=2.4 * mm):
+def signal(c, x, y, n=18, step=1.35 * mm, h=3.6 * mm, seed=7):
+    """一排高低不一的竖线，像电平表/数据条，替代 ASCII 装饰。"""
     c.setFillColor(HAIR)
-    p = c.beginPath()
-    s = size
-    p.moveTo(x, y)
-    p.curveTo(x - s, y + s * 0.9, x - s, y + s * 1.9, x, y + s * 1.45)
-    p.curveTo(x + s, y + s * 1.9, x + s, y + s * 0.9, x, y)
-    c.drawPath(p, stroke=0, fill=1)
+    k = seed or 7
+    for i in range(n):
+        k = (k * 1103515245 + 12345) % 2147483648
+        bh = h * (0.25 + ((k >> 9) % 100) / 130)
+        c.rect(x + i * step, y, 0.55 * mm, bh, stroke=0, fill=1)
+
+
+def laser_band(c, x, y, w, h=1.3 * mm):
+    for j, col in enumerate((PINK, PURPLE, CYAN)):
+        c.saveState()
+        c.setFillAlpha(0.4)
+        c.setFillColor(col)
+        c.rect(x + w * (0.06 + j * 0.12), y, w * 0.42, h, stroke=0, fill=1)
+        c.restoreState()
 
 
 def serial(code: str) -> str:
@@ -353,14 +362,14 @@ def blank_head(c, x, y, title, kind_label, code):
     text(c, title, x + pad + 20 * mm, top - 4.6 * mm, 5.4, color=SOFT)
     tiny(c, "SHORT 1:8 A4" if kind_label == "短期" else "LONG 1:8 A4",
          x + CARD_W - pad, top - 1.6 * mm, 3.2, SOFT, "r")
+    laser_band(c, x + pad, y + CARD_H - 2.2 * mm, CARD_W - 2 * pad, 1.0 * mm)
 
 
 def blank_footer(c, x, y, code):
     pad = 3.0 * mm
     barcode(c, x + pad, y + 2.2 * mm, 34 * mm, 3.4 * mm, code)
-    tiny(c, "// XXY.PRINT  " + serial(code), x + pad + 36 * mm, y + 3.2 * mm, 3.0, SOFT)
-    heart(c, x + CARD_W - pad - 3 * mm, y + 2.6 * mm, 2.2 * mm)
-    pixels(c, x + pad + 36 * mm, y + 5.6 * mm, 5, 1, 1.2 * mm, 0.5 * mm)
+    signal(c, x + pad + 36 * mm, y + 2.2 * mm, 16, 1.15 * mm, 4.6 * mm, sum(ord(ch) for ch in code))
+    tiny(c, serial(code), x + CARD_W - pad, y + 2.6 * mm, 2.8, SOFT, "r")
 
 
 def draw_blank_short(c, x, y, code, url):
@@ -489,9 +498,8 @@ def draw_blank_back(c, x, y, code):
 
     # 装饰
     barcode(c, x + pad, y + 2.4 * mm, 40 * mm, 3.4 * mm, code)
-    tiny(c, "// XXY.REVIEW  0x%04X" % (abs(hash(code)) % 0xFFFF), x + pad + 42 * mm, y + 3.4 * mm, 3.0, SOFT)
-    heart(c, x + CARD_W - pad - 3 * mm, y + 2.8 * mm, 2.2 * mm)
-    pixels(c, x + pad + 42 * mm, y + 6.0 * mm, 4, 1, 1.2 * mm, 0.5 * mm)
+    signal(c, x + pad + 42 * mm, y + 2.4 * mm, 14, 1.2 * mm, 4.6 * mm, abs(hash(code)) % 997)
+    tiny(c, serial(code), x + CARD_W - pad, y + 2.8 * mm, 2.8, SOFT, "r")
 
 
 def draw_back(c, x, y, t, url):
