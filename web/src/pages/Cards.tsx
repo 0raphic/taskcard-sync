@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from '../lib/router';
 import { pb } from '../lib/pb';
 import type { ShortLink, Task } from '../lib/types';
@@ -35,6 +35,39 @@ function groupOf(row: Row): Group {
   if (t.status === 'done') return 'done';
   if (t.draft) return 'unused';
   return 'using';
+}
+
+function SelectAllBox({
+  checked,
+  indeterminate,
+  disabled,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  disabled: boolean;
+  onChange: () => void;
+  label: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <>
+      <input
+        ref={ref}
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+        aria-label={label}
+        className="h-3.5 w-3.5 accent-seal disabled:opacity-40"
+      />
+      <span className={disabled ? 'text-oncanvas/30' : ''}>{label}</span>
+    </>
+  );
 }
 
 export function Cards() {
@@ -165,6 +198,8 @@ export function Cards() {
     }
   }
 
+  const groupActive = shown.filter((r) => r.active !== false).map((r) => r.code);
+
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -179,43 +214,10 @@ export function Cards() {
         <div className="flex flex-wrap gap-2">
           <Link
             to="/print"
-            className={
-              picked.length > 0
-                ? 'border border-line/25 px-4 py-2 text-[12px] text-oncanvas/75 hover:border-line/50'
-                : 'bg-seal px-4 py-2 text-[12px] font-medium text-white hover:opacity-90'
-            }
+            className="bg-seal px-4 py-2 text-[12px] font-medium text-white hover:opacity-90"
           >
             打印新空白卡
           </Link>
-          {picked.length > 0 && (
-            <>
-              <label className="flex cursor-pointer items-center gap-1.5 border border-line/20 px-3 py-2 text-[11px] text-oncanvas/60">
-                <input
-                  type="checkbox"
-                  className="accent-seal"
-                  checked={fillSheet}
-                  onChange={(e) => setFillSheet(e.target.checked)}
-                />
-                用新卡填满这页
-              </label>
-              <button
-                type="button"
-                onClick={() => reprint(picked, fillSheet)}
-                disabled={busy !== null}
-                className="bg-seal px-4 py-2 text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-50"
-              >
-                补印选中的 {picked.length} 张
-              </button>
-              <button
-                type="button"
-                onClick={() => revokeMany(picked)}
-                disabled={busy !== null}
-                className="border border-seal/40 px-3 py-2 text-[12px] text-seal hover:border-seal/70 disabled:opacity-50"
-              >
-                作废选中的 {picked.length} 张
-              </button>
-            </>
-          )}
           {batch.length > 0 && (
             <button
               type="button"
@@ -234,7 +236,10 @@ export function Cards() {
           <button
             key={g.key}
             type="button"
-            onClick={() => setGroup(g.key)}
+            onClick={() => {
+              setGroup(g.key);
+              setPicked([]);
+            }}
             className={`border px-2.5 py-1 text-[12px] transition-colors ${
               group === g.key
                 ? 'border-seal bg-seal/15 text-oncanvas'
@@ -246,41 +251,72 @@ export function Cards() {
           </button>
         ))}
         <div className="ml-auto flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              const alive = shown.filter((r) => r.active !== false).map((r) => r.code);
-              const allPicked = alive.length > 0 && alive.every((c) => picked.includes(c));
-              setPicked(allPicked ? picked.filter((c) => !alive.includes(c)) : Array.from(new Set([...picked, ...alive])));
-            }}
-            className="text-[11px] text-oncanvas/45 hover:text-oncanvas/80"
-          >
-            {shown.length > 0 && shown.filter((r) => r.active !== false).every((r) => picked.includes(r.code))
-              ? '取消选择本组'
-              : `选择本组（${shown.filter((r) => r.active !== false).length}）`}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const all = (rows ?? []).filter((r) => r.active !== false).map((r) => r.code);
-              const allPicked = all.length > 0 && all.every((c) => picked.includes(c));
-              setPicked(allPicked ? [] : all);
-            }}
-            className="text-[11px] text-oncanvas/45 hover:text-oncanvas/80"
-          >
-            {(rows ?? []).filter((r) => r.active !== false).every((r) => picked.includes(r.code)) &&
-            (rows ?? []).some((r) => r.active !== false)
-              ? '取消全选'
-              : `全选（${(rows ?? []).filter((r) => r.active !== false).length}）`}
-          </button>
-          {picked.length > 0 && (
-            <button type="button" onClick={() => setPicked([])} className="text-[11px] text-oncanvas/45 hover:text-oncanvas/80">
-              清空
-            </button>
-          )}
           <span className="text-[11px] text-oncanvas/30">短码是纸卡的身份证，别改它</span>
         </div>
       </div>
+
+      {rows && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-line/25 bg-oncanvas/[0.03] px-3 py-2">
+          <label className="flex cursor-pointer items-center gap-2 text-[12px] text-oncanvas/70">
+            <SelectAllBox
+              checked={groupActive.length > 0 && groupActive.every((c) => picked.includes(c))}
+              indeterminate={groupActive.some((c) => picked.includes(c)) && !groupActive.every((c) => picked.includes(c))}
+              disabled={groupActive.length === 0}
+              onChange={() => {
+                const all = groupActive.length > 0 && groupActive.every((c) => picked.includes(c));
+                setPicked((prev) =>
+                  all
+                    ? prev.filter((c) => !groupActive.includes(c))
+                    : Array.from(new Set([...prev, ...groupActive])),
+                );
+              }}
+              label={`本组全选（${groupActive.length}）`}
+            />
+          </label>
+          <span className="font-mono text-[11px] text-oncanvas/40">
+            已选 {picked.length} 张
+          </span>
+          <span className="text-[11px] text-oncanvas/25">勾上后可以一次补印或一次作废</span>
+
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-oncanvas/55">
+              <input
+                type="checkbox"
+                className="accent-seal"
+                checked={fillSheet}
+                onChange={(e) => setFillSheet(e.target.checked)}
+                disabled={picked.length === 0}
+              />
+              用新卡填满这页
+            </label>
+            <button
+              type="button"
+              onClick={() => reprint(picked, fillSheet)}
+              disabled={busy !== null || picked.length === 0}
+              className="bg-seal px-3 py-1.5 text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-40"
+            >
+              补印选中的 {picked.length} 张
+            </button>
+            <button
+              type="button"
+              onClick={() => revokeMany(picked)}
+              disabled={busy !== null || picked.length === 0}
+              className="border border-seal/40 px-3 py-1.5 text-[12px] text-seal hover:border-seal/70 disabled:opacity-40"
+            >
+              作废选中的 {picked.length} 张
+            </button>
+            {picked.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setPicked([])}
+                className="text-[11px] text-oncanvas/45 hover:text-oncanvas/80"
+              >
+                清空
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {flash && <p className="text-[12px] text-oncanvas/60">{flash}</p>}
 
