@@ -186,6 +186,19 @@ export async function logProgress(taskId: string, note: string, delta = 0) {
 }
 
 /** 删除任务：服务端会连带清掉短链和进展记录（PB 关系不级联） */
+export async function completeTask(
+  id: string,
+): Promise<{ next?: { id: string; code: string; due: string } }> {
+  const res = await fetch(`/ds-api/tasks/${encodeURIComponent(id)}/done`, { method: 'POST' });
+  const body = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    next?: { id: string; code: string; due: string };
+  };
+  if (!res.ok || !body.ok) throw new Error(body.error || `完成失败（${res.status}）`);
+  return { next: body.next };
+}
+
 export async function deleteTask(id: string) {
   const res = await fetch(`/ds-api/tasks/${encodeURIComponent(id)}`, { method: 'DELETE' });
   const body = (await res.json().catch(() => ({}))) as {

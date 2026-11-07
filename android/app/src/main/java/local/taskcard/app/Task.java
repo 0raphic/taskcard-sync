@@ -17,6 +17,7 @@ public class Task {
     public String notes = "";
     public String tags = "";
     public String remindAt = "";
+    public String repeat = "";
     public int estimateMin = 0;
     public int progress = 0;
     public int weeklyHours = 0;
@@ -40,6 +41,7 @@ public class Task {
         t.notes = o.optString("notes");
         t.tags = o.optString("tags");
         t.remindAt = o.optString("remind_at");
+        t.repeat = o.optString("repeat");
         t.estimateMin = o.optInt("estimate_min");
         t.progress = o.optInt("progress");
         t.weeklyHours = o.optInt("weekly_hours");
@@ -54,6 +56,14 @@ public class Task {
             }
         }
         return t;
+    }
+
+    public static String repeatLabel(String v) {
+        if ("daily".equals(v)) return "每天";
+        if ("weekdays".equals(v)) return "工作日";
+        if ("weekly".equals(v)) return "每周";
+        if ("monthly".equals(v)) return "每月";
+        return "";
     }
 
     public boolean matches(String q) {

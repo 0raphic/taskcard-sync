@@ -78,6 +78,8 @@ public class TaskAdapter extends RecyclerView.Adapter<TaskAdapter.VH> {
         h.desc.setVisibility(h.desc.getText().length() == 0 ? View.GONE : View.VISIBLE);
         String m = t.estimateMin > 0 ? "用时 " + t.estimateMin + " 分" : "";
         if ("long".equals(t.kind)) m = "进度 " + t.progress + "%" + (t.weeklyHours > 0 ? " · 每周 " + t.weeklyHours + "h" : "");
+        String rep = Task.repeatLabel(t.repeat);
+        if (!rep.isEmpty()) m = m.isEmpty() ? "↻ " + rep : m + " · ↻ " + rep;
         h.meta.setText(m);
         h.meta.setVisibility(m.isEmpty() ? View.GONE : View.VISIBLE);
         String[] tagList = t.tags.split("[,，\\s]+");

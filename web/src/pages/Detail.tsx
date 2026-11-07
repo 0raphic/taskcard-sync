@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TaskSheet } from '../components/TaskSheet';
-import { logProgress, message, useTask, useUpdateTask, deleteTask } from '../lib/data';
+import { completeTask, logProgress, message, useTask, useUpdateTask, deleteTask } from '../lib/data';
 import { pb } from '../lib/pb';
 import { fmtDateTime } from '../lib/time';
 import { Link, navigate } from '../lib/router';
@@ -10,6 +10,7 @@ import {
   type ChecklistItem,
   type ProgressLog,
   type Status,
+  REPEAT_OPTIONS,
 } from '../lib/types';
 
 export function Detail({ id }: { id: string }) {
@@ -25,6 +26,7 @@ export function Detail({ id }: { id: string }) {
   const [plan, setPlan] = useState({ priority: '', dod: '', start: '', weekly_hours: '' });
   const [tagText, setTagText] = useState('');
   const [remindText, setRemindText] = useState('');
+  const [repeat, setRepeat] = useState('');
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [newItem, setNewItem] = useState('');
 
@@ -32,6 +34,7 @@ export function Detail({ id }: { id: string }) {
     if (!task) return;
     setTagText(task.tags ?? '');
     setRemindText(task.remind_at ?? '');
+    setRepeat(task.repeat ?? '');
     setItems(Array.isArray(task.checklist) ? task.checklist : []);
   }, [task]);
 
@@ -100,8 +103,13 @@ export function Detail({ id }: { id: string }) {
   async function setStatus(status: Status) {
     setBusy(true);
     try {
-      await update(id, { status });
-      setFlash(`已改为「${STATUS_LABEL[status]}」`);
+      if (status === 'done') {
+        const r = await completeTask(id);
+        setFlash(r.next ? `已完成，下一张排到 ${r.next.due}` : '已标记完成');
+      } else {
+        await update(id, { status });
+        setFlash(`已改为「${STATUS_LABEL[status]}」`);
+      }
     } catch (e) {
       setFlash(message(e));
     } finally {
@@ -262,6 +270,27 @@ export function Detail({ id }: { id: string }) {
               placeholder="MM-DD HH:mm，例如 11-08 09:00（留空不提醒）"
               className="w-full border border-line/20 bg-transparent px-3 py-2 text-[12.5px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/50"
             />
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="flex items-baseline gap-2 text-[11px] tracking-[0.18em] text-oncanvas/45">
+              重复
+              <span className="font-mono text-[10px] tracking-normal text-oncanvas/30">完成时自动生成下一张</span>
+            </h2>
+            <select
+              value={repeat}
+              onChange={(e) => {
+                setRepeat(e.target.value);
+                void savePlan({ repeat: e.target.value });
+              }}
+              className="w-full border border-line/20 bg-transparent px-3 py-2 text-[12.5px] text-oncanvas focus:border-line/50"
+            >
+              {REPEAT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </section>
 
           <section className="flex flex-col gap-2">

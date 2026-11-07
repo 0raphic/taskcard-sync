@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { TaskCard } from '../components/TaskCard';
-import { useTasks, useUpdateTask } from '../lib/data';
+import { completeTask, useTasks, useUpdateTask } from '../lib/data';
 import { askNotify, notifyPermission, tickReminders } from '../lib/reminders';
 import { Link } from '../lib/router';
 import { isDone, isOverdue, isToday, type Task } from '../lib/types';
@@ -103,7 +103,12 @@ export function Board() {
     setHeld(null);
     if (!t || t.status === status) return;
     try {
-      await update(t.id, { status });
+      if (status === 'done') {
+        const r = await completeTask(t.id);
+        setFlash(r.next ? `已完成，下一张排到 ${r.next.due}` : '已完成');
+      } else {
+        await update(t.id, { status });
+      }
     } catch (e) {
       setFlash(e instanceof Error ? e.message : String(e));
     }
@@ -117,7 +122,12 @@ export function Board() {
     const t = (tasks ?? []).find((x) => x.id === id);
     if (!t || t.status === status) return;
     try {
-      await update(id, { status });
+      if (status === 'done') {
+        const r = await completeTask(id);
+        setFlash(r.next ? `已完成，下一张排到 ${r.next.due}` : '已完成');
+      } else {
+        await update(id, { status });
+      }
     } catch (e) {
       setFlash(e instanceof Error ? e.message : String(e));
     }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { TaskSheet } from '../components/TaskSheet';
-import { logProgress, message, useShortLink, useUpdateTask } from '../lib/data';
+import { completeTask, logProgress, message, useShortLink, useUpdateTask } from '../lib/data';
 import { Link } from '../lib/router';
 import { STATUS_LABEL, type Status } from '../lib/types';
 import { fileToJpegDataUrl } from '../lib/image';
@@ -41,11 +41,16 @@ export function Landing({ code }: { code: string }) {
     setFlash(null);
     try {
       if (review.trim()) await logProgress(task.id, `复盘：${review.trim()}`);
-      await update(task.id, { status: 'done' });
+      const r = await completeTask(task.id);
       setReviewing(false);
       setReview('');
-      setFlash('做完了，纸卡可以收进文件夹了');
-      setDone({ title: '这张卡做完了', hint: '看板上已经进「已完成」，纸卡可以收进文件夹。' });
+      setFlash(r.next ? `做完了，下一张排到 ${r.next.due}` : '做完了，纸卡可以收进文件夹了');
+      setDone({
+        title: '这张卡做完了',
+        hint: r.next
+          ? `下一张已经排到 ${r.next.due}，看板上能直接看到。`
+          : '看板上已经进「已完成」，纸卡可以收进文件夹。',
+      });
     } catch (e) {
       setFlash(`没改成：${message(e)}`);
     } finally {

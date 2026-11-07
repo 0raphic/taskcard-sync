@@ -272,6 +272,32 @@ public class BoardFragment extends Fragment {
 
     private void setStatus(Task t, String status, Runnable retry) {
         try {
+            if ("done".equals(status)) {
+                Api.post(requireContext(), "/ds-api/tasks/" + t.id + "/done", new JSONObject(), new Api.Cb() {
+                    @Override
+                    public void ok(String b) {
+                        String due = "";
+                        try {
+                            JSONObject next = new JSONObject(b).optJSONObject("next");
+                            if (next != null) due = next.optString("due");
+                        } catch (Exception ignored) {
+                        }
+                        Ui.toast(requireContext(), due.isEmpty() ? "已完成" : "已完成，下一张 " + due);
+                        load();
+                    }
+
+                    @Override
+                    public void fail(Exception e) {
+                        if (e instanceof Api.NeedPasscode) {
+                            Ui.needPasscode(requireActivity(), () -> setStatus(t, status, null));
+                        } else {
+                            Ui.toast(requireContext(), e.getMessage());
+                            load();
+                        }
+                    }
+                });
+                return;
+            }
             JSONObject body = new JSONObject();
             body.put("status", status);
             Api.patch(requireContext(), "/api/collections/tasks/records/" + t.id, body, new Api.Cb() {

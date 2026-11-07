@@ -33,6 +33,8 @@ public class DetailActivity extends AppCompatActivity {
     private EditText title, due, estimate, priority, dod, start, materials, notes, weekly, tags, remind;
     private LinearLayout checklistBox;
     private JSONArray checklist = new JSONArray();
+    private TextView repeatView;
+    private String repeatValue = "";
     private ChipGroup statusGroup;
     private SeekBar progressBar;
     private TextView progressLabel;
@@ -108,6 +110,19 @@ public class DetailActivity extends AppCompatActivity {
         notes = field(body, "备注", InputType.TYPE_CLASS_TEXT);
         tags = field(body, "标签（逗号分隔）", InputType.TYPE_CLASS_TEXT);
         remind = field(body, "提醒（MM-DD HH:mm，留空不提醒）", InputType.TYPE_CLASS_TEXT);
+
+        body.addView(Ui.label(this, "重复（完成时自动生成下一张）"));
+        repeatView = new TextView(this);
+        repeatView.setTextSize(15);
+        repeatView.setPadding(Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12));
+        android.graphics.drawable.GradientDrawable rg = new android.graphics.drawable.GradientDrawable();
+        rg.setColor(Ui.attr(this, com.google.android.material.R.attr.colorSurface));
+        rg.setCornerRadius(0);
+        rg.setStroke(Ui.dp(this, 1), Ui.attr(this, com.google.android.material.R.attr.colorOutline));
+        repeatView.setBackground(rg);
+        repeatView.setTextColor(Ui.attr(this, com.google.android.material.R.attr.colorOnSurface));
+        repeatView.setOnClickListener(v -> chooseRepeat());
+        body.addView(repeatView);
 
         body.addView(Ui.label(this, "清单"));
         checklistBox = Ui.column(this);
@@ -206,6 +221,8 @@ public class DetailActivity extends AppCompatActivity {
         notes.setText(task.notes);
         tags.setText(task.tags);
         remind.setText(task.remindAt);
+        repeatValue = task.repeat == null ? "" : task.repeat;
+        repeatView.setText("重复：" + (Task.repeatLabel(repeatValue).isEmpty() ? "不重复" : Task.repeatLabel(repeatValue)));
         checklist = task.checklist != null ? task.checklist : new JSONArray();
         renderChecklist();
         progressBar.setProgress(task.progress);
@@ -232,6 +249,7 @@ public class DetailActivity extends AppCompatActivity {
         b.put("estimate_min", est.isEmpty() ? 0 : Integer.parseInt(est));
         String wk = weekly.getText().toString().trim();
         b.put("weekly_hours", wk.isEmpty() ? 0 : Integer.parseInt(wk));
+        b.put("repeat", repeatValue);
         for (int i = 0; i < statusGroup.getChildCount(); i++) {
             Chip c = (Chip) statusGroup.getChildAt(i);
             if (c.isChecked()) b.put("status", String.valueOf(c.getTag()));
@@ -297,8 +315,30 @@ public class DetailActivity extends AppCompatActivity {
             Api.patch(this, "/api/collections/tasks/records/" + id, body, new Api.Cb() {
                 @Override
                 public void ok(String b) {
-                    Ui.toast(DetailActivity.this, "已保存");
                     Reminders.scheduleAll(DetailActivity.this);
+                    if ("done".equals(body.optString("status"))) {
+                        Api.post(DetailActivity.this, "/ds-api/tasks/" + id + "/done", new JSONObject(), new Api.Cb() {
+                            @Override
+                            public void ok(String nb) {
+                                String due = "";
+                                try {
+                                    JSONObject next = new JSONObject(nb).optJSONObject("next");
+                                    if (next != null) due = next.optString("due");
+                                } catch (Exception ignored) {
+                                }
+                                Ui.toast(DetailActivity.this, due.isEmpty() ? "已完成" : "已完成，下一张 " + due);
+                                finish();
+                            }
+
+                            @Override
+                            public void fail(Exception e) {
+                                Ui.toast(DetailActivity.this, "已完成（下一张没建成：" + e.getMessage() + "）");
+                                finish();
+                            }
+                        });
+                        return;
+                    }
+                    Ui.toast(DetailActivity.this, "已保存");
                     finish();
                 }
 
@@ -314,6 +354,21 @@ public class DetailActivity extends AppCompatActivity {
         } catch (Exception e) {
             Ui.toast(this, "保存失败：" + e.getMessage());
         }
+    }
+
+    private void chooseRepeat() {
+        String[] labels = {"不重复", "每天", "工作日", "每周", "每月"};
+        String[] values = {"", "daily", "weekdays", "weekly", "monthly"};
+        int checked = 0;
+        for (int i = 0; i < values.length; i++) if (values[i].equals(repeatValue)) checked = i;
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("重复")
+                .setSingleChoiceItems(labels, checked, (d, which) -> {
+                    repeatValue = values[which];
+                    repeatView.setText("重复：" + labels[which]);
+                    d.dismiss();
+                })
+                .show();
     }
 
     private void confirmDelete() {

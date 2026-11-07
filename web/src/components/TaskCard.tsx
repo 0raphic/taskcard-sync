@@ -1,5 +1,5 @@
 import { Link } from '../lib/router';
-import { checkStats, isOverdue, isToday, parseTags, type Task } from '../lib/types';
+import { checkStats, isOverdue, isToday, parseTags, repeatLabel, type Task } from '../lib/types';
 import { ProgressBar, StatusPill } from './StatusPill';
 
 export function TaskCard({ task }: { task: Task }) {
@@ -15,6 +15,7 @@ export function TaskCard({ task }: { task: Task }) {
           {task.kind === 'short' ? '短期 / SHORT' : '长期 / LONG'}
           {overdue && <span className="tracking-normal text-seal">· 逾期</span>}
           {today && !overdue && <span className="tracking-normal text-amber">· 今天</span>}
+          {task.repeat && <span className="tracking-normal text-ink-soft">· ↻ {repeatLabel(task.repeat)}</span>}
         </span>
         <StatusPill status={task.status} />
       </div>

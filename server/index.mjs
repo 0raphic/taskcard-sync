@@ -653,6 +653,90 @@ function callPythonJson(script, payload, timeoutMs = 30000) {
 }
 
 // 勾选任务 → 生成 1/8 A4 卡片 PDF（复用 scripts/gen_cards.py 的排版）
+
+// —— 重复任务：完成当前这张时，自动生成下一张 ——
+const REPEATS = new Set(['daily', 'weekdays', 'weekly', 'monthly']);
+const REPEAT_LABEL = { daily: '每天', weekdays: '工作日', weekly: '每周', monthly: '每月' };
+
+function mdToDate(md) {
+  const m = /^(\d{1,2})-(\d{1,2})$/.exec(String(md || '').trim());
+  if (!m) return null;
+  const d = new Date(new Date().getFullYear(), Number(m[1]) - 1, Number(m[2]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+function dateToMD(d) {
+  return String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function nextDue(repeat, due) {
+  const base = mdToDate(due) || new Date();
+  const d = new Date(base.getTime());
+  if (repeat === 'weekly') d.setDate(d.getDate() + 7);
+  else if (repeat === 'monthly') d.setMonth(d.getMonth() + 1);
+  else if (repeat === 'weekdays') {
+    do {
+      d.setDate(d.getDate() + 1);
+    } while (d.getDay() === 0 || d.getDay() === 6);
+  } else d.setDate(d.getDate() + 1);
+  return dateToMD(d);
+}
+
+app.post('/ds-api/tasks/:id/done', async (req, res) => {
+  const id = String(req.params.id || '');
+  try {
+    const got = await pbReq('/api/collections/tasks/records/' + encodeURIComponent(id));
+    if (!got.ok || !got.json?.id) return res.status(404).json({ ok: false, error: '这张卡不在了' });
+    const task = got.json;
+    const patched = await pbReq('/api/collections/tasks/records/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      body: { status: 'done', client_updated_at: new Date().toISOString() },
+    });
+    if (!patched.ok) return res.status(400).json({ ok: false, error: '标记完成失败' });
+
+    if (!REPEATS.has(task.repeat)) return res.json({ ok: true });
+
+    const due = nextDue(task.repeat, task.due);
+    const checklist = Array.isArray(task.checklist)
+      ? task.checklist.map((i) => ({ t: String(i?.t || ''), d: false }))
+      : [];
+    const created = await pbReq('/api/collections/tasks/records', {
+      method: 'POST',
+      body: {
+        title: task.title,
+        kind: task.kind || 'short',
+        status: 'todo',
+        due,
+        start: '',
+        priority: task.priority || '',
+        dod: task.dod || '',
+        estimate_min: task.estimate_min ?? 0,
+        description: task.description || '',
+        materials: task.materials || '',
+        notes: task.notes || '',
+        tags: task.tags || '',
+        repeat: task.repeat,
+        checklist,
+        progress: 0,
+        draft: false,
+        client_updated_at: new Date().toISOString(),
+      },
+    });
+    if (!created.ok) return res.status(500).json({ ok: false, error: '下一张没建成' });
+    const next = created.json;
+    const code = await uniqueCode();
+    await pbReq('/api/collections/short_links/records', {
+      method: 'POST',
+      body: { code, task: next.id, active: true, scans: 0 },
+    });
+    await pbReq('/api/collections/progress_logs/records', {
+      method: 'POST',
+      body: { task: next.id, text: '从重复任务生成（' + (REPEAT_LABEL[task.repeat] || task.repeat) + '）', at: new Date().toISOString() },
+    });
+    return res.json({ ok: true, next: { id: next.id, code, due } });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message || '完成失败' });
+  }
+});
+
 app.post('/ds-api/cards.pdf', async (req, res) => {
   const body = req.body || {};
   const ids = Array.isArray(body.ids)

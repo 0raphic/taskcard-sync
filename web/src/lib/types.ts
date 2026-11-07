@@ -1,6 +1,18 @@
 export const STATUSES = ['todo', 'doing', 'done', 'paused'] as const;
 export type Status = (typeof STATUSES)[number];
 
+export const REPEAT_OPTIONS = [
+  { value: '', label: '不重复' },
+  { value: 'daily', label: '每天' },
+  { value: 'weekdays', label: '工作日' },
+  { value: 'weekly', label: '每周' },
+  { value: 'monthly', label: '每月' },
+] as const;
+
+export function repeatLabel(v?: string) {
+  return REPEAT_OPTIONS.find((o) => o.value === (v ?? ''))?.label ?? '不重复';
+}
+
 export const STATUS_LABEL: Record<Status, string> = {
   todo: '待办',
   doing: '进行中',
@@ -32,6 +44,7 @@ export type Task = {
   weekly_hours?: number;
   tags?: string;
   remind_at?: string;
+  repeat?: string;
   checklist?: ChecklistItem[];
   draft?: boolean;
   client_updated_at?: string;
