@@ -39,6 +39,14 @@ public class BoardFragment extends Fragment {
     private String filter = "all";
     private String query = "";
     private final List<Task> all = new ArrayList<>();
+    private final android.os.Handler ticker = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable tick = new Runnable() {
+        @Override
+        public void run() {
+            load();
+            ticker.postDelayed(this, 20_000);
+        }
+    };
 
     @Nullable
     @Override
@@ -353,5 +361,19 @@ public class BoardFragment extends Fragment {
         } catch (Exception e) {
             return s;
         }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        load();
+        ticker.removeCallbacks(tick);
+        ticker.postDelayed(tick, 20_000);
+    }
+
+    @Override
+    public void onPause() {
+        ticker.removeCallbacks(tick);
+        super.onPause();
     }
 }

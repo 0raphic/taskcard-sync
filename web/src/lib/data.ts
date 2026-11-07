@@ -11,10 +11,19 @@ export function useTasks() {
     let alive = true;
     let unsub: (() => void) | undefined;
 
-    pb.collection('tasks')
-      .getFullList<Task>({ sort: 'created' })
-      .then((list) => alive && setTasks(list))
-      .catch((e: unknown) => alive && setError(message(e)));
+    const reload = () =>
+      pb.collection('tasks')
+        .getFullList<Task>({ sort: 'created' })
+        .then((list) => alive && setTasks(list))
+        .catch((e: unknown) => alive && setError(message(e)));
+
+    reload();
+
+    // 实时通道偶尔会静默断线：回到页面、或每隔一分钟补一次全量拉取
+    const onFocus = () => reload();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    const timer = window.setInterval(reload, 60_000);
 
     pb.collection('tasks')
       .subscribe<Task>('*', (e) => {
@@ -33,6 +42,9 @@ export function useTasks() {
 
     return () => {
       alive = false;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+      window.clearInterval(timer);
       unsub?.();
     };
   }, []);

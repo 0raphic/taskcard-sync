@@ -2,6 +2,13 @@ package local.taskcard.app;
 
 import android.content.Intent;
 import android.net.Uri;
+import androidx.core.content.FileProvider;
+import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import org.json.JSONObject;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -143,6 +150,28 @@ public class SettingsFragment extends Fragment {
             });
         }
 
+        MaterialButton print = new MaterialButton(c, null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        print.setText("打印空白卡（导出 PDF）");
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        plp.topMargin = Ui.dp(c, 16);
+        root.addView(print, plp);
+        print.setOnClickListener(v -> new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("打印空白卡")
+                .setItems(new String[]{
+                        "短期卡 8 张（双面，一页）",
+                        "长期卡 8 张（双面，一页）",
+                        "短期卡 16 张（双面，两页）",
+                        "长期卡 16 张（双面，两页）"
+                }, (d, which) -> {
+                    boolean isLong = which % 2 == 1;
+                    int count = which >= 2 ? 16 : 8;
+                    generateBlank(isLong ? "long" : "short", count);
+                })
+                .setNegativeButton("取消", null)
+                .show());
+
         MaterialButton web = new MaterialButton(c, null,
                 com.google.android.material.R.attr.materialButtonOutlinedStyle);
         web.setText("在浏览器里打开网页版");
@@ -177,5 +206,57 @@ public class SettingsFragment extends Fragment {
                 .show());
 
         return scroll;
+    }
+
+    private void generateBlank(String kind, int count) {
+        final android.content.Context c = requireContext();
+        Ui.toast(c, "正在生成 PDF…");
+        try {
+            JSONObject body = new JSONObject();
+            body.put("count", count);
+            body.put("kind", kind);
+            body.put("double_sided", true);
+            body.put("base_url", Api.base(c));
+            String stamp = new SimpleDateFormat("MMdd-HHmm", Locale.CHINA).format(new Date());
+            File out = new File(c.getFilesDir(), "print/taskcard-" + stamp + ".pdf");
+            Api.postFile(c, "/ds-api/cards.blank", body, out, new Api.Cb() {
+                @Override
+                public void ok(String path) {
+                    openPdf(new File(path));
+                }
+
+                @Override
+                public void fail(Exception e) {
+                    if (e instanceof Api.NeedLogin) {
+                        Ui.toast(c, "登录已失效，请重新登录。");
+                    } else {
+                        Ui.toast(c, "导出没有成功。" + e.getMessage());
+                    }
+                }
+            });
+        } catch (Exception e) {
+            Ui.toast(c, "导出没有成功。" + e.getMessage());
+        }
+    }
+
+    private void openPdf(File file) {
+        try {
+            Uri uri = FileProvider.getUriForFile(requireContext(), BuildConfig.APPLICATION_ID + ".files", file);
+            Intent view = new Intent(Intent.ACTION_VIEW);
+            view.setDataAndType(uri, "application/pdf");
+            view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                startActivity(view);
+                Ui.toast(requireContext(), "已生成 PDF。在打开的页面里点「打印」或分享。");
+            } catch (Exception noViewer) {
+                Intent send = new Intent(Intent.ACTION_SEND);
+                send.setType("application/pdf");
+                send.putExtra(Intent.EXTRA_STREAM, uri);
+                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(send, "打印或保存 PDF"));
+            }
+        } catch (Exception e) {
+            Ui.toast(requireContext(), "打不开 PDF。" + e.getMessage());
+        }
     }
 }

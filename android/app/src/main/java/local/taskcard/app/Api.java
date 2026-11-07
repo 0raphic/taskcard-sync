@@ -8,6 +8,8 @@ import android.os.Looper;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -72,6 +74,49 @@ public final class Api {
 
     public static void delete(Context c, String path, Cb cb) {
         call(c, "DELETE", path, null, cb);
+    }
+
+    /** POST 一个返回 PDF 的接口，直接写进文件（打印空白卡用） */
+    public static void postFile(Context c, String path, JSONObject body, File out, Cb cb) {
+        Context app = c.getApplicationContext();
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                if (out.getParentFile() != null) out.getParentFile().mkdirs();
+                conn = (HttpURLConnection) new URL(base(app) + path).openConnection();
+                conn.setRequestMethod("POST");
+                conn.setConnectTimeout(6000);
+                conn.setReadTimeout(60000);
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Content-Type", "application/json");
+                String t = token(app);
+                if (t != null && !t.isEmpty()) {
+                    conn.setRequestProperty("authorization", "Bearer " + t);
+                    conn.setRequestProperty("x-write-token", t);
+                }
+                try (OutputStream os = conn.getOutputStream()) {
+                    os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                }
+                int code = conn.getResponseCode();
+                if (code >= 400) {
+                    String resp = read(conn.getErrorStream());
+                    if (code == 401 && resp.contains("need_login")) throw new NeedLogin();
+                    if (code == 401 && resp.contains("need_passcode")) throw new NeedPasscode();
+                    throw new IOException(trim(resp));
+                }
+                try (InputStream is = conn.getInputStream();
+                     FileOutputStream fos = new FileOutputStream(out)) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = is.read(buf)) > 0) fos.write(buf, 0, n);
+                }
+                new Handler(Looper.getMainLooper()).post(() -> cb.ok(out.getAbsolutePath()));
+            } catch (Exception e) {
+                new Handler(Looper.getMainLooper()).post(() -> cb.fail(e));
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }).start();
     }
 
     public static void call(Context c, String method, String path, JSONObject body, Cb cb) {
