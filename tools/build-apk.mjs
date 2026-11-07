@@ -5,8 +5,14 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'nod
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..');
-const SDK = process.env.ANDROID_SDK_ROOT || 'D:/Application/Android/Sdk';
-const GRADLE = process.env.GRADLE_BIN || 'D:/Application/gradle/gradle-8.10.2/bin/gradle.bat';
+const DEFAULT_SDK = 'D:/Application/AI/Android/Sdk';
+const DEFAULT_GRADLE = 'D:/Application/AI/gradle/gradle-8.10.2/bin/gradle.bat';
+// 环境变量可能是旧的（setx 只对新终端生效），指向不存在的路径时回退到默认位置
+const SDK =
+  [process.env.ANDROID_SDK_ROOT, DEFAULT_SDK].find((p) => p && existsSync(join(p, 'platform-tools'))) ||
+  DEFAULT_SDK;
+const GRADLE =
+  [process.env.GRADLE_BIN, DEFAULT_GRADLE].find((p) => p && existsSync(p)) || DEFAULT_GRADLE;
 const JAVA_HOME = process.env.JAVA_HOME || 'C:\\Program Files\\Java\\jdk-22';
 const RELEASE = process.argv.includes('--release');
 const APK = join(
@@ -32,7 +38,7 @@ const VER = (() => {
 const OUT = join(OUT_DIR, RELEASE ? `taskcard-${VER}-release.apk` : 'taskcard.apk');
 
 if (!existsSync(GRADLE)) {
-  console.error('没找到 Gradle。解压到 D:/Application/gradle/，或用 GRADLE_BIN 指向 gradle.bat。');
+  console.error('没找到 Gradle。解压到 D:/Application/AI/gradle/，或用 GRADLE_BIN 指向 gradle.bat。');
   process.exit(1);
 }
 if (!existsSync(join(SDK, 'platforms'))) {
@@ -47,7 +53,7 @@ if (!existsSync(join(ROOT, 'android', 'local.properties'))) {
 console.log('[apk] 编译中…');
 execSync(`"${GRADLE}" -p "${join(ROOT, 'android')}" ${RELEASE ? 'assembleRelease' : 'assembleDebug'} --no-daemon`, {
   stdio: 'inherit',
-  env: { ...process.env, JAVA_HOME, GRADLE_USER_HOME: process.env.GRADLE_USER_HOME || 'D:/Application/gradle/home' },
+  env: { ...process.env, JAVA_HOME, GRADLE_USER_HOME: process.env.GRADLE_USER_HOME || 'D:/Application/AI/gradle/home' },
 });
 
 mkdirSync(OUT_DIR, { recursive: true });

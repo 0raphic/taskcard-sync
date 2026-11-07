@@ -33,3 +33,6 @@ tools/gradle/
 
 # Gradle 缓存（体积大，重建时自动生成）
 gradle-home/
+
+# 签名文件（本地生成，别提交）
+android/taskcard-release.jks

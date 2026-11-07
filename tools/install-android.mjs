@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-const SDK = process.env.ANDROID_SDK_ROOT || 'D:/Application/Android/Sdk';
+const SDK = process.env.ANDROID_SDK_ROOT || 'D:/Application/AI/Android/Sdk';
 const CACHE = join(import.meta.dirname, '..', '.cache');
 const ZIP = join(CACHE, 'cmdline-tools.zip');
 const URL =
