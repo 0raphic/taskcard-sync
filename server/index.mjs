@@ -598,6 +598,64 @@ app.post('/ds-api/cards.pdf', async (req, res) => {
 });
 
 // 打印空白表：先建 N 张占位卡（draft，不在看板出现）+ 短码，再出空白版式 PDF
+// 作废一张纸卡：码还在，但扫到会显示「已作废」，不再能写回
+app.post('/ds-api/cards.revoke', async (req, res) => {
+  const code = String(req.body?.code || '').trim();
+  if (!code) return res.status(400).json({ ok: false, error: '要指定短码' });
+  const lq = await pbReq(
+    `/api/collections/short_links/records?perPage=1&filter=${encodeURIComponent(`code="${code}"`)}`,
+  );
+  const link = lq.json?.items?.[0];
+  if (!link) return res.status(404).json({ ok: false, error: `短码 ${code} 不在系统里` });
+  const r = await pbReq(`/api/collections/short_links/records/${link.id}`, {
+    method: 'PATCH',
+    body: { active: false },
+  });
+  if (!r.ok) return res.status(500).json({ ok: false, error: r.json?.message || '作废失败' });
+  res.json({ ok: true, code });
+});
+
+// 补印：按原来的短码重新出空白卡（码不变，纸换了）；可以一次补一批
+app.post('/ds-api/cards.reprint', async (req, res) => {
+  const list = Array.isArray(req.body?.codes)
+    ? req.body.codes.map((c) => String(c || '').trim()).filter(Boolean)
+    : [String(req.body?.code || '').trim()].filter(Boolean);
+  if (!list.length) return res.status(400).json({ ok: false, error: '要指定短码' });
+  if (list.length > 200) return res.status(400).json({ ok: false, error: '一次最多 200 张' });
+
+  try {
+    const tasks = [];
+    const codes = new Map();
+    for (const code of list) {
+      const lq = await pbReq(
+        `/api/collections/short_links/records?perPage=1&filter=${encodeURIComponent(`code="${code}"`)}&expand=task`,
+      );
+      const link = lq.json?.items?.[0];
+      if (!link) return res.status(404).json({ ok: false, error: `短码 ${code} 不在系统里` });
+      if (link.active === false) {
+        return res.status(400).json({ ok: false, error: `短码 ${code} 已作废，先恢复再补印` });
+      }
+      const task = link.expand?.task ?? (await pbReq(`/api/collections/tasks/records/${link.task}`)).json;
+      if (!task) return res.status(404).json({ ok: false, error: `短码 ${code} 的任务不在了` });
+      tasks.push(task);
+      codes.set(task.id, code);
+    }
+
+    const baseUrl = baseUrlOf(req.body?.base_url) || `http://${lanIp()}:${WEB_PORT}`;
+    const payload = cardsPayload(tasks, codes, baseUrl, { blank: true });
+    const out = await renderCards(payload, { doubleSided: !!req.body?.double_sided });
+    if (!out.buffer) return res.status(out.status || 500).json({ ok: false, error: out.error });
+
+    res.setHeader('content-type', 'application/pdf');
+    res.setHeader('content-disposition', `inline; filename="${pdfName('reprint')}"`);
+    res.setHeader('x-card-count', String(payload.tasks.length));
+    res.setHeader('x-card-codes', list.join(','));
+    res.send(out.buffer);
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.post('/ds-api/cards.blank', async (req, res) => {
   const body = req.body || {};
   const count = Math.min(64, Math.max(1, Number(body.count) || 8));
@@ -635,6 +693,11 @@ app.post('/ds-api/cards.blank', async (req, res) => {
     res.setHeader('content-type', 'application/pdf');
     res.setHeader('content-disposition', `inline; filename="${pdfName('blank-cards')}"`);
     res.setHeader('x-card-count', String(payload.tasks.length));
+    // 前端记下这批短码，方便「补印上一批」
+    res.setHeader(
+      'x-card-codes',
+      payload.tasks.map((t) => codes.get(t.id)).filter(Boolean).join(','),
+    );
     res.send(out.buffer);
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
@@ -714,6 +777,14 @@ app.post('/ds-api/scan', async (req, res) => {
         code,
       });
     }
+    if (link.active === false) {
+      return res.status(410).json({
+        ok: false,
+        error: `这张卡已经作废（短码 ${code}）。在「卡片」页可以补印一张新的，旧纸就留着当便签。`,
+        code,
+        revoked: true,
+      });
+    }
     let task = link.expand?.task;
     if (!task) {
       const tq = await pbReq(`/api/collections/tasks/records/${link.task}`);
@@ -726,7 +797,7 @@ app.post('/ds-api/scan', async (req, res) => {
 
     await pbReq(`/api/collections/short_links/records/${link.id}`, {
       method: 'PATCH',
-      body: { scans: (link.scans || 0) + 1 },
+      body: { scans: (link.scans || 0) + 1, last_scan_at: new Date().toISOString() },
     });
 
     res.json({

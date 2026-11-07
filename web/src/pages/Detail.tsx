@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { TaskSheet } from '../components/TaskSheet';
 import { logProgress, message, useTask, useUpdateTask, deleteTask } from '../lib/data';
 import { pb } from '../lib/pb';
+import { fmtDateTime } from '../lib/time';
 import { Link, navigate } from '../lib/router';
 import {
   STATUSES,
@@ -88,23 +89,23 @@ export function Detail({ id }: { id: string }) {
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-5">
       <div className="flex items-center justify-between">
-        <Link to="/" className="text-[12px] text-paper/50 hover:text-paper">
+        <Link to="/" className="text-[12px] text-oncanvas/50 hover:text-oncanvas">
           ← 看板
         </Link>
-        <span className="font-mono text-[10px] text-paper/25">
+        <span className="font-mono text-[10px] text-oncanvas/25">
           {code ? <>短码 {code}</> : id}
         </span>
       </div>
 
       {error && <p className="text-[13px] text-seal">{error}</p>}
-      {!task && !error && <div className="h-[360px] animate-pulse bg-paper/10" />}
+      {!task && !error && <div className="h-[360px] animate-pulse bg-oncanvas/10" />}
 
       {task && (
         <>
           <TaskSheet task={task} />
 
           <section className="flex flex-col gap-2">
-            <h2 className="text-[11px] tracking-[0.18em] text-paper/45">改状态</h2>
+            <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">改状态</h2>
             <div className="grid grid-cols-4 gap-2">
               {STATUSES.map((s) => (
                 <button
@@ -114,25 +115,25 @@ export function Detail({ id }: { id: string }) {
                   onClick={() => setStatus(s)}
                   className={`border px-2 py-2.5 text-[12px] transition-colors disabled:opacity-50 ${
                     task.status === s
-                      ? 'border-seal bg-seal/15 text-paper'
-                      : 'border-paper/20 text-paper/70 hover:border-paper/45'
+                      ? 'border-seal bg-seal/15 text-oncanvas'
+                      : 'border-line/20 text-oncanvas/70 hover:border-line/45'
                   }`}
                 >
                   {STATUS_LABEL[s]}
                 </button>
               ))}
             </div>
-            {flash && <p className="text-[11px] text-paper/45">{flash}</p>}
+            {flash && <p className="text-[11px] text-oncanvas/45">{flash}</p>}
           </section>
 
           {task.kind === 'long' && (
             <section className="flex flex-col gap-2">
-              <h2 className="text-[11px] tracking-[0.18em] text-paper/45">进度</h2>
+              <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">进度</h2>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setProgress((task.progress ?? 0) - 10)}
-                  className="h-8 w-8 border border-paper/20 text-paper/70 hover:border-paper/45"
+                  className="h-8 w-8 border border-line/20 text-oncanvas/70 hover:border-line/45"
                 >
                   −
                 </button>
@@ -140,7 +141,7 @@ export function Detail({ id }: { id: string }) {
                 <button
                   type="button"
                   onClick={() => setProgress((task.progress ?? 0) + 10)}
-                  className="h-8 w-8 border border-paper/20 text-paper/70 hover:border-paper/45"
+                  className="h-8 w-8 border border-line/20 text-oncanvas/70 hover:border-line/45"
                 >
                   +
                 </button>
@@ -149,34 +150,34 @@ export function Detail({ id }: { id: string }) {
           )}
 
           <section className="flex flex-col gap-2">
-            <h2 className="text-[11px] tracking-[0.18em] text-paper/45">进展记录</h2>
+            <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">进展记录</h2>
             <div className="flex gap-2">
               <input
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addNote()}
                 placeholder="今天推进到哪了？"
-                className="flex-1 border border-paper/20 bg-transparent px-3 py-2 text-[13px] text-paper placeholder:text-paper/25 focus:border-paper/40"
+                className="flex-1 border border-line/20 bg-transparent px-3 py-2 text-[13px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/40"
               />
               <button
                 type="button"
                 disabled={busy || !note.trim()}
                 onClick={addNote}
-                className="border border-paper/25 px-4 text-[12px] text-paper/80 hover:border-paper/50 disabled:opacity-40"
+                className="border border-line/25 px-4 text-[12px] text-oncanvas/80 hover:border-line/50 disabled:opacity-40"
               >
                 记一笔
               </button>
             </div>
             {logs.length === 0 ? (
-              <p className="text-[11px] text-paper/30">还没有记录。</p>
+              <p className="text-[11px] text-oncanvas/30">还没有记录。</p>
             ) : (
-              <ul className="flex flex-col divide-y divide-white/5">
+              <ul className="flex flex-col divide-y divide-line/40">
                 {logs.map((row) => (
                   <li key={row.id} className="flex items-baseline gap-3 py-2">
-                    <span className="shrink-0 font-mono text-[10px] text-paper/30">
-                      {row.at ? row.at.slice(5, 16).replace('T', ' ') : ''}
+                    <span className="shrink-0 font-mono text-[10px] text-oncanvas/30">
+                      {fmtDateTime(row.at)}
                     </span>
-                    <span className="text-[12.5px] text-paper/75">{row.note}</span>
+                    <span className="text-[12.5px] text-oncanvas/75">{row.note}</span>
                   </li>
                 ))}
               </ul>
@@ -194,12 +195,12 @@ export function Detail({ id }: { id: string }) {
                 >
                   删除这张任务卡
                 </button>
-                <span className="text-[11px] text-paper/35">删了就找不回来。</span>
+                <span className="text-[11px] text-oncanvas/35">删了就找不回来。</span>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                <p className="text-[12px] leading-relaxed text-paper/60">
-                  会一起删掉：短码 <span className="font-mono text-paper/80">{code || '（还没生成）'}</span>、
+                <p className="text-[12px] leading-relaxed text-oncanvas/60">
+                  会一起删掉：短码 <span className="font-mono text-oncanvas/80">{code || '（还没生成）'}</span>、
                   {logs.length} 条进展记录。已经打印出去的纸卡扫这个码会显示「已经不在系统里」。
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -215,7 +216,7 @@ export function Detail({ id }: { id: string }) {
                     type="button"
                     onClick={() => setConfirming(false)}
                     disabled={deleting}
-                    className="border border-paper/25 px-4 py-2 text-[12px] text-paper/70 hover:border-paper/45 disabled:opacity-40"
+                    className="border border-line/25 px-4 py-2 text-[12px] text-oncanvas/70 hover:border-line/45 disabled:opacity-40"
                   >
                     取消
                   </button>

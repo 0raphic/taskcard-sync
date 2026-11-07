@@ -5,19 +5,43 @@ import { Link, navigate } from '../lib/router';
 import { STATUS_LABEL, type Status } from '../lib/types';
 
 export function Landing({ code }: { code: string }) {
-  const { loading, task, link, error, notFound } = useShortLink(code);
+  const { loading, task, link, error, notFound, revoked } = useShortLink(code);
   const update = useUpdateTask();
   const [pending, setPending] = useState<Status | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [reviewing, setReviewing] = useState(false);
+  const [review, setReview] = useState('');
 
   async function act(status: Status) {
     if (!task) return;
+    // 完成前先问一句复盘，可跳过
+    if (status === 'done') {
+      setReviewing(true);
+      return;
+    }
     setPending(status);
     setFlash(null);
     try {
       await update(task.id, { status });
       setFlash(`已标记为「${STATUS_LABEL[status]}」`);
+    } catch (e) {
+      setFlash(`没改成：${message(e)}`);
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function finish() {
+    if (!task) return;
+    setPending('done');
+    setFlash(null);
+    try {
+      if (review.trim()) await logProgress(task.id, `复盘：${review.trim()}`);
+      await update(task.id, { status: 'done' });
+      setReviewing(false);
+      setReview('');
+      setFlash('做完了，纸卡可以收进文件夹了');
     } catch (e) {
       setFlash(`没改成：${message(e)}`);
     } finally {
@@ -49,17 +73,35 @@ export function Landing({ code }: { code: string }) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-mat px-4 py-8">
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-canvas px-4 py-8">
       <div className="w-full max-w-[420px]">
-        <div className="mb-3 flex items-center justify-between px-1 font-mono text-[10px] tracking-[0.2em] text-paper/40">
+        <div className="mb-3 flex items-center justify-between px-1 font-mono text-[10px] tracking-[0.2em] text-oncanvas/40">
           <span>任务卡片 · 扫码</span>
-          <span className="text-paper/60">{code}</span>
+          <span className="text-oncanvas/60">{code}</span>
         </div>
 
-        {loading && <div className="h-[380px] animate-pulse bg-paper/10" />}
+        {loading && <div className="h-[380px] animate-pulse bg-oncanvas/10" />}
 
-        {!loading && error && (
-          <div className="bg-paper px-6 py-10 text-ink trim">
+        {!loading && revoked && (
+          <div className="bg-surface px-6 py-10 text-ink trim">
+            <p className="text-[15px] font-semibold">这张卡已经作废</p>
+            <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">
+              这张纸的码已经停用，再写回也不会生效。手上这张可以留着当便签；
+              需要的话去「卡片」页补印一张。
+            </p>
+            <div className="mt-6 flex gap-2">
+              <Link to="/cards" className="border border-ink/25 px-3 py-2 text-[12px] hover:bg-ink/5">
+                去卡片页
+              </Link>
+              <Link to="/" className="border border-ink/25 px-3 py-2 text-[12px] hover:bg-ink/5">
+                回看板
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {!loading && !revoked && error && (
+          <div className="bg-surface px-6 py-10 text-ink trim">
             <p className="text-[15px] font-semibold">这张卡不在系统里了</p>
             <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">
               可能它已经被删掉（纸上这张就留作便签），也可能短码印错了、或者数据库还没导入。
@@ -76,30 +118,32 @@ export function Landing({ code }: { code: string }) {
           </div>
         )}
 
-        {task && <TaskSheet task={task} code={code} scans={link?.scans} />}
+        {task && (
+          <TaskSheet task={task} code={code} scans={link?.scans} lastScan={link?.last_scan_at} />
+        )}
 
         {task?.kind === 'long' && (
-          <section className="mt-3 border border-paper/15 bg-paper/[0.03] px-3 pb-3 pt-2.5">
-            <div className="flex items-center justify-between text-[10px] tracking-[0.16em] text-paper/45">
+          <section className="mt-3 border border-line/15 bg-oncanvas/[0.03] px-3 pb-3 pt-2.5">
+            <div className="flex items-center justify-between text-[10px] tracking-[0.16em] text-oncanvas/45">
               <span>长期任务 · 进度</span>
-              <span className="font-mono text-[12px] tracking-normal text-paper/80">{pct}%</span>
+              <span className="font-mono text-[12px] tracking-normal text-oncanvas/80">{pct}%</span>
             </div>
             <div className="mt-2 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => bump(-10)}
-                className="h-9 w-9 shrink-0 border border-paper/25 text-[16px] leading-none text-paper/80 hover:border-paper/50"
+                className="h-9 w-9 shrink-0 border border-line/25 text-[16px] leading-none text-oncanvas/80 hover:border-line/50"
                 aria-label="进度减 10%"
               >
                 −
               </button>
-              <div className="h-1.5 flex-1 bg-paper/10">
+              <div className="h-1.5 flex-1 bg-oncanvas/10">
                 <div className="h-full bg-seal transition-[width] duration-300" style={{ width: `${pct}%` }} />
               </div>
               <button
                 type="button"
                 onClick={() => bump(10)}
-                className="h-9 w-9 shrink-0 border border-paper/25 text-[16px] leading-none text-paper/80 hover:border-paper/50"
+                className="h-9 w-9 shrink-0 border border-line/25 text-[16px] leading-none text-oncanvas/80 hover:border-line/50"
                 aria-label="进度加 10%"
               >
                 ＋
@@ -110,12 +154,12 @@ export function Landing({ code }: { code: string }) {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="写一句进展，记到详情里"
-                className="min-w-0 flex-1 border border-paper/20 bg-transparent px-2 py-1.5 text-[12px] text-paper placeholder:text-paper/25 focus:border-paper/40"
+                className="min-w-0 flex-1 border border-line/20 bg-transparent px-2 py-1.5 text-[12px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/40"
               />
               <button
                 type="button"
                 onClick={addNote}
-                className="shrink-0 border border-paper/25 px-3 text-[11px] text-paper/80 hover:border-paper/50"
+                className="shrink-0 border border-line/25 px-3 text-[11px] text-oncanvas/80 hover:border-line/50"
               >
                 记一笔
               </button>
@@ -123,22 +167,22 @@ export function Landing({ code }: { code: string }) {
           </section>
         )}
 
-        {task && (
+        {task && !reviewing && (
           <div className="mt-4 flex flex-col gap-2">
             <button
               type="button"
               disabled={pending !== null}
               onClick={() => act('done')}
-              className="w-full bg-seal px-4 py-4 text-[15px] font-semibold tracking-[0.1em] text-paper transition-colors hover:bg-seal/90 disabled:opacity-50"
+              className="w-full bg-seal px-4 py-4 text-[15px] font-semibold tracking-[0.1em] text-white transition-colors hover:bg-seal/90 disabled:opacity-50"
             >
-              {pending === 'done' ? '提交中…' : '✓ 做完了'}
+              完成
             </button>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 disabled={pending !== null}
                 onClick={() => act('doing')}
-                className="border border-paper/25 px-4 py-3 text-[13px] text-paper/85 transition-colors hover:border-paper/50 disabled:opacity-50"
+                className="border border-line/25 px-4 py-3 text-[13px] text-oncanvas/85 transition-colors hover:border-line/50 disabled:opacity-50"
               >
                 正在进行
               </button>
@@ -146,25 +190,62 @@ export function Landing({ code }: { code: string }) {
                 type="button"
                 disabled={pending !== null}
                 onClick={() => act('paused')}
-                className="border border-paper/25 px-4 py-3 text-[13px] text-paper/85 transition-colors hover:border-paper/50 disabled:opacity-50"
+                className="border border-line/25 px-4 py-3 text-[13px] text-oncanvas/85 transition-colors hover:border-line/50 disabled:opacity-50"
               >
                 先搁置
               </button>
             </div>
+          </div>
+        )}
 
-            <div className="flex items-center justify-between gap-3 px-1 pt-1 text-[11px] text-paper/40">
-              <span>{flash ?? '点一下，网页和纸卡就同步了'}</span>
-              <Link
-                to={`/tasks/${task.id}`}
-                className="shrink-0 underline decoration-paper/25 underline-offset-4"
+        {task && reviewing && (
+          <div className="mt-4 flex flex-col gap-2 border border-seal/30 bg-surface px-4 py-4 text-ink">
+            <p className="text-[13px] font-semibold">收尾时说一句</p>
+            <p className="text-[11px] leading-relaxed text-ink-soft">
+              这一步卡了多久、为什么、下次怎么改——写一句就够，跳过也行。
+            </p>
+            <textarea
+              value={review}
+              onChange={(e) => setReview(e.target.value)}
+              rows={2}
+              autoFocus
+              placeholder="例：比预估多花 20 分钟，二维码尺寸量错重印了一次"
+              className="w-full resize-none border border-ink/15 px-2 py-1.5 text-[12px] text-ink placeholder:text-ink-soft/50 focus:border-ink/35"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={pending !== null}
+                onClick={finish}
+                className="flex-1 bg-seal px-3 py-2.5 text-[13px] font-medium text-white disabled:opacity-50"
               >
-                详情
-              </Link>
+                {pending === 'done' ? '保存中…' : '保存并完成'}
+              </button>
+              <button
+                type="button"
+                disabled={pending !== null}
+                onClick={finish}
+                className="border border-ink/20 px-3 py-2.5 text-[12px] text-ink-soft hover:border-ink/40"
+              >
+                跳过
+              </button>
             </div>
           </div>
         )}
 
-        <p className="mt-8 text-center text-[10px] tracking-[0.18em] text-paper/25">
+        {task && (
+          <div className="mt-3 flex items-center justify-between gap-3 px-1 text-[11px] text-oncanvas/40">
+            <span>{flash ?? '点一下，网页和纸卡就同步了'}</span>
+            <Link
+              to={`/tasks/${task.id}`}
+              className="shrink-0 underline decoration-oncanvas/25 underline-offset-4"
+            >
+              详情
+            </Link>
+          </div>
+        )}
+
+        <p className="mt-8 text-center text-[10px] tracking-[0.18em] text-oncanvas/25">
           <button
             type="button"
             className="underline-offset-4 hover:underline"

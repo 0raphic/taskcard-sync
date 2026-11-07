@@ -5,6 +5,7 @@ import { Capture } from './pages/Capture';
 import { Detail } from './pages/Detail';
 import { Landing } from './pages/Landing';
 import { Print } from './pages/Print';
+import { Cards } from './pages/Cards';
 import { Settings } from './pages/Settings';
 import { TaskList } from './pages/TaskList';
 
@@ -21,6 +22,7 @@ export function App() {
   else if (path.startsWith('/tasks')) page = <TaskList />;
   else if (path.startsWith('/capture')) page = <Capture />;
   else if (path.startsWith('/print')) page = <Print />;
+  else if (path.startsWith('/cards')) page = <Cards />;
   else if (path.startsWith('/settings')) page = <Settings />;
   else if (path !== '/' && path !== '') page = <NotFound path={path} />;
 
@@ -30,9 +32,9 @@ export function App() {
 function NotFound({ path }: { path: string }) {
   return (
     <div className="flex flex-col gap-2 py-16">
-      <p className="font-mono text-[12px] text-paper/40">{path}</p>
+      <p className="font-mono text-[12px] text-oncanvas/40">{path}</p>
       <h1 className="text-[22px] font-semibold">没有这个页面</h1>
-      <p className="text-[13px] text-paper/50">
+      <p className="text-[13px] text-oncanvas/50">
         回 <a href="/" className="underline underline-offset-4">看板</a> 吧。
       </p>
     </div>

@@ -24,7 +24,7 @@ export function ProgressBar({ value = 0, className = '' }: { value?: number; cla
   const pct = Math.max(0, Math.min(100, value));
   return (
     <div
-      className={`h-2 w-full border border-ink/25 bg-paper-dim ${className}`}
+      className={`h-2 w-full border border-ink/25 bg-surface-dim ${className}`}
       role="progressbar"
       aria-valuenow={pct}
       aria-valuemin={0}

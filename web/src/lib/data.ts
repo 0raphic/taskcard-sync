@@ -48,6 +48,7 @@ export function useShortLink(code: string | undefined) {
     task?: Task;
     error?: string;
     notFound?: boolean;
+    revoked?: boolean;
   }>({ loading: true });
 
   useEffect(() => {
@@ -64,10 +65,25 @@ export function useShortLink(code: string | undefined) {
       .getFirstListItem<ShortLink>(`code="${code}"`, { expand: 'task' })
       .then(async (link) => {
         linkFound = true;
-        // 顺手记一次扫码，失败不影响主流程
+        // 顺手记一次扫码（次数 + 时间），失败不影响主流程
         pb.collection('short_links')
-          .update(link.id, { scans: (link.scans ?? 0) + 1 })
+          .update(link.id, {
+            scans: (link.scans ?? 0) + 1,
+            last_scan_at: new Date().toISOString(),
+          })
           .catch(() => {});
+
+        if (link.active === false) {
+          if (alive) {
+            setState({
+              loading: false,
+              link,
+              revoked: true,
+              error: '这张卡已经作废',
+            });
+          }
+          return;
+        }
 
         const task =
           link.expand?.task ?? (await pb.collection('tasks').getOne<Task>(link.task));

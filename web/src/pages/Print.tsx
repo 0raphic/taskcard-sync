@@ -23,25 +23,16 @@ const LONG_FIELDS = [
   ['本周', '推进 / 卡点 / 下一步'],
 ];
 
-function hintNoLan(url: string) {
-  try {
-    const host = new URL(url).hostname;
-    return host === '127.0.0.1' || host === 'localhost' || host === '::1';
-  } catch {
-    return true;
-  }
-}
-
 function CardPreview({ kind }: { kind: Kind }) {
   const fields = kind === 'short' ? SHORT_FIELDS : LONG_FIELDS;
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between text-[11px] text-paper/40">
+      <div className="flex items-center justify-between text-[11px] text-oncanvas/40">
         <span>卡面预览（1/8 A4 · 105 × 74.25mm）</span>
         <span className="font-mono">{kind === 'short' ? '短期卡' : '长期卡'}</span>
       </div>
       <div
-        className="relative w-full border border-dashed border-paper/25 bg-paper px-4 py-3 text-ink"
+        className="relative w-full border border-dashed border-line/25 bg-surface px-4 py-3 text-ink"
         style={{ aspectRatio: '105 / 74.25' }}
       >
         <div className="flex items-start justify-between">
@@ -56,7 +47,7 @@ function CardPreview({ kind }: { kind: Kind }) {
           <div className="flex flex-col items-center">
             <div className="grid grid-cols-4 gap-[1px] bg-ink p-[2px]">
               {Array.from({ length: 16 }).map((_, i) => (
-                <span key={i} className={`h-[3px] w-[3px] ${i % 3 ? 'bg-paper' : 'bg-ink'}`} />
+                <span key={i} className={`h-[3px] w-[3px] ${i % 3 ? 'bg-surface' : 'bg-ink'}`} />
               ))}
             </div>
             <span className="mt-0.5 font-mono text-[7px] text-ink-soft">A7K2m9</span>
@@ -76,8 +67,7 @@ function CardPreview({ kind }: { kind: Kind }) {
 }
 
 export function Print() {
-  const [baseUrl, setBaseUrl] = useState('');
-  const [netHint, setNetHint] = useState<{ url: string; lan: boolean } | null>(null);
+  const [netUrl, setNetUrl] = useState('');
   const [kind, setKind] = useState<Kind>('short');
   const [count, setCount] = useState(8);
   const [doubleSided, setDoubleSided] = useState(false);
@@ -88,11 +78,8 @@ export function Print() {
   useEffect(() => {
     fetch('/ds-api/net')
       .then((r) => r.json())
-      .then((b: { url?: string; lan?: boolean }) => {
-        if (b?.url) {
-          setNetHint({ url: b.url, lan: Boolean(b.lan) });
-          setBaseUrl((prev) => prev || b.url!);
-        }
+      .then((b: { url?: string }) => {
+        if (b?.url) setNetUrl(b.url);
       })
       .catch(() => {});
   }, []);
@@ -101,8 +88,6 @@ export function Print() {
     if (preview) URL.revokeObjectURL(preview);
   }, [preview]);
 
-  const noLan = baseUrl ? hintNoLan(baseUrl) : false;
-
   async function generate() {
     setBusy(true);
     setFlash(null);
@@ -110,11 +95,19 @@ export function Print() {
       const res = await fetch('/ds-api/cards.blank', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ count, kind, base_url: baseUrl, double_sided: doubleSided }),
+        body: JSON.stringify({ count, kind, double_sided: doubleSided }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error || `生成失败 HTTP ${res.status}`);
+      }
+      const codes = (res.headers.get('x-card-codes') || '').split(',').filter(Boolean);
+      if (codes.length) {
+        try {
+          localStorage.setItem('taskcard:lastBatch', JSON.stringify(codes));
+        } catch {
+          /* 无痕模式忽略 */
+        }
       }
       const url = URL.createObjectURL(await res.blob());
       setPreview(url);
@@ -134,9 +127,9 @@ export function Print() {
   return (
     <div className="mx-auto flex w-full max-w-[980px] flex-col gap-5">
       <header>
-        <p className="font-mono text-[11px] tracking-[0.18em] text-paper/40">打印</p>
+        <p className="font-mono text-[11px] tracking-[0.18em] text-oncanvas/40">打印</p>
         <h1 className="mt-1 text-[24px] font-semibold tracking-tight">打印一叠空白卡</h1>
-        <p className="mt-1 max-w-[640px] text-[12px] leading-relaxed text-paper/45">
+        <p className="mt-1 max-w-[640px] text-[12px] leading-relaxed text-oncanvas/45">
           只印空白表：每张带一个唯一二维码，是这张纸的身份证。写完拍照，先扫码认出是哪张卡，
           再读上面的手写内容——任务改名、换数据库，这张纸也不会失效。
         </p>
@@ -144,30 +137,21 @@ export function Print() {
 
       <div className="grid gap-6 md:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
-          <section className="flex flex-col gap-2 border border-paper/15 p-3">
-            <label className="text-[11px] tracking-[0.14em] text-paper/45">二维码指向（手机要能打开）</label>
-            <input
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="http://192.168.0.108:8088"
-              className="w-full border border-paper/20 bg-transparent px-3 py-2 font-mono text-[12px] text-paper placeholder:text-paper/25 focus:border-paper/40"
-            />
-            {noLan && (
-              <p className="text-[11px] leading-relaxed text-amber">
-                这是本机地址，手机扫不开。换成电脑的局域网 IP（{netHint?.url || 'http://192.168.x.x:8088'}）。
-              </p>
-            )}
-          </section>
+          <p className="text-[11px] leading-relaxed text-oncanvas/40">
+            二维码会自动指向本机局域网地址{' '}
+            <span className="font-mono text-oncanvas/70">{netUrl || '（正在探测…）'}</span>
+            ，手机连同一个 Wi-Fi 就能扫开。
+          </p>
 
-          <section className="flex flex-col gap-3 border border-paper/15 p-3">
+          <section className="flex flex-col gap-3 border border-line/15 p-3">
             <div className="flex items-center gap-2 text-[12px]">
-              <span className="w-[52px] shrink-0 text-paper/45">卡型</span>
+              <span className="w-[52px] shrink-0 text-oncanvas/45">卡型</span>
               {(['short', 'long'] as const).map((k) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => setKind(k)}
-                  className={`border px-3 py-1.5 ${kind === k ? 'border-seal/60 bg-seal/10 text-paper' : 'border-paper/20 text-paper/60 hover:border-paper/45'}`}
+                  className={`border px-3 py-1.5 ${kind === k ? 'border-seal/60 bg-seal/10 text-oncanvas' : 'border-line/20 text-oncanvas/60 hover:border-line/45'}`}
                 >
                   {k === 'short' ? '短期卡（任务）' : '长期卡（目标）'}
                 </button>
@@ -175,21 +159,21 @@ export function Print() {
             </div>
 
             <div className="flex items-center gap-2 text-[12px]">
-              <span className="w-[52px] shrink-0 text-paper/45">张数</span>
+              <span className="w-[52px] shrink-0 text-oncanvas/45">张数</span>
               {[8, 16, 24].map((n) => (
                 <button
                   key={n}
                   type="button"
                   onClick={() => setCount(n)}
-                  className={`border px-3 py-1.5 font-mono ${count === n ? 'border-seal/60 bg-seal/10 text-paper' : 'border-paper/20 text-paper/60 hover:border-paper/45'}`}
+                  className={`border px-3 py-1.5 font-mono ${count === n ? 'border-seal/60 bg-seal/10 text-oncanvas' : 'border-line/20 text-oncanvas/60 hover:border-line/45'}`}
                 >
                   {n}
                 </button>
               ))}
-              <span className="ml-2 text-[11px] text-paper/35">一页 8 张</span>
+              <span className="ml-2 text-[11px] text-oncanvas/35">一页 8 张</span>
             </div>
 
-            <label className="flex items-center gap-2 text-[12px] text-paper/70">
+            <label className="flex items-center gap-2 text-[12px] text-oncanvas/70">
               <input
                 type="checkbox"
                 checked={doubleSided}
@@ -199,7 +183,7 @@ export function Print() {
               双面打印（正面卡片 + 背面复盘卡）
             </label>
 
-            <p className="text-[11px] leading-relaxed text-paper/35">
+            <p className="text-[11px] leading-relaxed text-oncanvas/35">
               每张空白卡先在库里建一条「占位」记录（不在看板显示）。拍到哪张，内容就写回哪条，
               保存后它才出现在看板上。
             </p>
@@ -213,13 +197,13 @@ export function Print() {
               {busy ? '排版中…' : `生成空白卡（${count} 张）`}
             </button>
 
-            {flash && <p className="text-[12px] leading-relaxed text-paper/60">{flash}</p>}
+            {flash && <p className="text-[12px] leading-relaxed text-oncanvas/60">{flash}</p>}
             {preview && (
               <a
                 href={preview}
                 target="_blank"
                 rel="noreferrer"
-                className="self-start border border-paper/25 px-3 py-1.5 text-[12px] text-paper/75 hover:border-paper/50"
+                className="self-start border border-line/25 px-3 py-1.5 text-[12px] text-oncanvas/75 hover:border-line/50"
               >
                 打开 PDF
               </a>

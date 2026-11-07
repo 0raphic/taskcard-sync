@@ -7,7 +7,7 @@ export function TaskCard({ task }: { task: Task }) {
   const today = isToday(task);
 
   return (
-    <article className="group relative flex flex-col gap-2.5 bg-paper px-4 pb-4 pt-3.5 text-ink trim paper-lift transition-transform duration-200 hover:-translate-y-0.5">
+    <article className="group relative flex flex-col gap-2.5 bg-surface px-4 pb-4 pt-3.5 text-ink trim paper-lift transition-transform duration-200 hover:-translate-y-0.5">
       <div className="flex items-start justify-between gap-2">
         <span className="flex items-center gap-1.5 pt-0.5 text-[10px] tracking-[0.22em] text-ink-soft">
           {task.kind === 'short' ? '短期任务' : '长期任务'}

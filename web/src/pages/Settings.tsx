@@ -52,14 +52,14 @@ export function Settings() {
 
   return (
     <div className="mx-auto w-full max-w-[720px] py-10">
-      <p className="text-[11px] tracking-[0.24em] text-paper/40">设置</p>
+      <p className="text-[11px] tracking-[0.24em] text-oncanvas/40">设置</p>
       <h1 className="mt-2 text-[26px] font-semibold">模型与 Key</h1>
-      <p className="mt-3 max-w-[52ch] text-[13px] leading-relaxed text-paper/60">
+      <p className="mt-3 max-w-[52ch] text-[13px] leading-relaxed text-oncanvas/60">
         Key 存在本机 PocketBase 里，只给服务端用，网页上只显示前几位。没有 Key 时「解析成任务」走本地规则，
         照片识别会提示未接。
       </p>
 
-      <div className="paper-lift mt-7 rounded-[3px] bg-paper p-6 text-ink">
+      <div className="paper-lift mt-7 rounded-[3px] bg-surface p-6 text-ink">
         <div className="flex items-center justify-between border-b border-ink/10 pb-4">
           <div>
             <p className="text-[11px] tracking-[0.18em] text-ink/45">DEEPSEEK</p>
@@ -111,7 +111,7 @@ export function Settings() {
           <button
             onClick={() => void save()}
             disabled={busy}
-            className="bg-ink px-5 py-2.5 text-[13px] text-paper disabled:opacity-60"
+            className="bg-ink px-5 py-2.5 text-[13px] text-oncanvas disabled:opacity-60"
           >
             {busy ? '保存中…' : '保存'}
           </button>

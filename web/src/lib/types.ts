@@ -37,6 +37,7 @@ export type ShortLink = {
   task: string;
   active: boolean;
   scans: number;
+  last_scan_at?: string;
   expand?: { task?: Task };
 };
 

@@ -1,9 +1,20 @@
 import type { Task } from '../lib/types';
+import { fmtAgo } from '../lib/time';
 import { ProgressBar, StatusPill } from './StatusPill';
 
-export function TaskSheet({ task, code, scans }: { task: Task; code?: string; scans?: number }) {
+export function TaskSheet({
+  task,
+  code,
+  scans,
+  lastScan,
+}: {
+  task: Task;
+  code?: string;
+  scans?: number;
+  lastScan?: string;
+}) {
   return (
-    <article className="relative bg-paper px-6 pb-6 pt-5 text-ink trim paper-lift">
+    <article className="relative bg-surface px-6 pb-6 pt-5 text-ink trim paper-lift">
       <div className="flex items-start justify-between gap-3">
         <span className="pt-1 text-[10px] tracking-[0.22em] text-ink-soft">
           {task.kind === 'short' ? '短期任务' : '长期任务'}
@@ -68,7 +79,10 @@ export function TaskSheet({ task, code, scans }: { task: Task; code?: string; sc
       {code && (
         <div className="mt-4 flex items-center justify-between border-t border-ink/10 pt-2 font-mono text-[10px] text-ink-soft/70">
           <span>{code}</span>
-          <span>{scans ? `被扫 ${scans} 次` : ''}</span>
+          <span className="text-right">
+            {scans ? `被扫 ${scans} 次` : ''}
+            {lastScan ? ` · ${fmtAgo(lastScan)}` : ''}
+          </span>
         </div>
       )}
     </article>

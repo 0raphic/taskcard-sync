@@ -53,6 +53,7 @@ export function Capture() {
   const fileRef2 = useRef<HTMLInputElement>(null);
   const [shotOpen, setShotOpen] = useState(false);
   const [scanned, setScanned] = useState<{ code: string; id: string; title: string } | null>(null);
+  const [queue, setQueue] = useState<File[]>([]);
   const inPageCam = canUseInPageCamera();
 
   async function structure() {
@@ -80,6 +81,20 @@ export function Capture() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function fromFiles(files: FileList | null) {
+    const list = Array.from(files ?? []);
+    if (list.length === 0) return;
+    setQueue(list.slice(1));
+    void fromImage(list[0]);
+  }
+
+  function nextOne() {
+    const [next, ...rest] = queue;
+    if (!next) return;
+    setQueue(rest);
+    void fromImage(next);
   }
 
   async function fromImage(file: File | Blob) {
@@ -164,6 +179,11 @@ export function Capture() {
         // 扫到的卡：把卡面内容写回这条记录，并把它从「空白卡」变成真实任务
         await pb.collection('tasks').update(scanned.id, { ...payload, draft: false });
         setFlash(`已写回短码 ${scanned.code} 的那张卡`);
+        if (queue.length > 0) {
+          setQueue((q) => q.slice(1));
+          void fromImage(queue[0]);
+          return;
+        }
         navigate(`/tasks/${scanned.id}`);
         return;
       }
@@ -180,6 +200,11 @@ export function Capture() {
       const code = shortCode();
       await pb.collection('short_links').create({ code, task: task.id, active: true, scans: 0 });
       setFlash(`已创建 · 短码 ${code}`);
+      if (queue.length > 0) {
+        setQueue((q) => q.slice(1));
+        void fromImage(queue[0]);
+        return;
+      }
       navigate(`/tasks/${task.id}`);
     } catch (e) {
       setFlash(`保存失败：${e instanceof Error ? e.message : String(e)}`);
@@ -191,9 +216,9 @@ export function Capture() {
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-5">
       <header>
-        <p className="font-mono text-[11px] tracking-[0.18em] text-paper/40">录入</p>
+        <p className="font-mono text-[11px] tracking-[0.18em] text-oncanvas/40">录入</p>
         <h1 className="mt-1 text-[24px] font-semibold tracking-tight">把纸卡上的内容丢进来</h1>
-        <p className="mt-1 text-[12px] leading-relaxed text-paper/45">
+        <p className="mt-1 text-[12px] leading-relaxed text-oncanvas/45">
           粘一段文字，DeepSeek 会拆成结构化字段；没配 Key 就用本地规则拆（标题、截止、用时、材料、备注都认）。
         </p>
       </header>
@@ -203,7 +228,7 @@ export function Capture() {
         onChange={(e) => setText(e.target.value)}
         rows={5}
         placeholder={'例：\n打印 8 张任务卡样张\n截止 11-07 用时 40 分\n材料：打印店、U盘\n先试印一张'}
-        className="w-full resize-y border border-paper/20 bg-transparent px-3 py-2.5 text-[13px] leading-relaxed text-paper placeholder:text-paper/25 focus:border-paper/40"
+        className="w-full resize-y border border-line/20 bg-transparent px-3 py-2.5 text-[13px] leading-relaxed text-oncanvas placeholder:text-oncanvas/25 focus:border-line/40"
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -216,7 +241,7 @@ export function Capture() {
           {busy ? '解析中…' : '解析成任务'}
         </button>
 
-        <label className="cursor-pointer border border-paper/20 px-3 py-2.5 text-[12px] text-paper/70 hover:border-paper/40">
+        <label className="cursor-pointer border border-line/20 px-3 py-2.5 text-[12px] text-oncanvas/70 hover:border-line/40">
           拍照识别
           <input
             ref={fileRef}
@@ -231,31 +256,43 @@ export function Capture() {
           />
         </label>
 
-        <label className="cursor-pointer border border-paper/20 px-3 py-2.5 text-[12px] text-paper/70 hover:border-paper/40">
+        <label className="cursor-pointer border border-line/20 px-3 py-2.5 text-[12px] text-oncanvas/70 hover:border-line/40">
           从相册
           <input
             ref={fileRef2}
             type="file"
             accept="image/*"
+            multiple
             className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void fromImage(f);
-            }}
+            onChange={(e) => fromFiles(e.target.files)}
           />
         </label>
+
+        {queue.length > 0 && (
+          <span className="flex items-center gap-2 border border-amber/35 bg-amber/10 px-3 py-2 text-[11px] text-oncanvas/75">
+            还有 {queue.length} 张没处理
+            <button
+              type="button"
+              onClick={nextOne}
+              disabled={busy}
+              className="border border-oncanvas/25 px-2 py-0.5 text-[11px] hover:border-oncanvas/50 disabled:opacity-40"
+            >
+              处理下一张
+            </button>
+          </span>
+        )}
 
         {inPageCam && (
           <button
             type="button"
             onClick={() => setShotOpen(true)}
-            className="border border-paper/20 px-3 py-2.5 text-[12px] text-paper/70 hover:border-paper/40"
+            className="border border-line/20 px-3 py-2.5 text-[12px] text-oncanvas/70 hover:border-line/40"
           >
             页内拍照
           </button>
         )}
 
-        {flash && <span className="text-[12px] text-paper/50">{flash}</span>}
+        {flash && <span className="text-[12px] text-oncanvas/50">{flash}</span>}
       </div>
 
       {shotOpen && (
@@ -269,33 +306,33 @@ export function Capture() {
       )}
 
       {raw && (
-        <details className="border border-paper/15 px-3 py-2 text-[12px] text-paper/60">
-          <summary className="cursor-pointer select-none text-paper/45">OCR 原文</summary>
+        <details className="border border-line/15 px-3 py-2 text-[12px] text-oncanvas/60">
+          <summary className="cursor-pointer select-none text-oncanvas/45">OCR 原文</summary>
           <pre className="mt-2 whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{raw}</pre>
         </details>
       )}
 
       {draft && (
-        <section className="flex flex-col gap-3 border-t border-white/10 pt-5">
+        <section className="flex flex-col gap-3 border-t border-line pt-5">
           {scanned && (
-            <div className="flex flex-wrap items-center gap-2 border border-moss/40 bg-moss/10 px-3 py-2 text-[12px] text-paper/80">
+            <div className="flex flex-wrap items-center gap-2 border border-moss/40 bg-moss/10 px-3 py-2 text-[12px] text-oncanvas/80">
               <span className="text-moss">认出卡片</span>
-              <span className="font-mono text-paper">{scanned.code}</span>
-              <span className="text-paper/45">·</span>
+              <span className="font-mono text-oncanvas">{scanned.code}</span>
+              <span className="text-oncanvas/45">·</span>
               <span>{scanned.title}</span>
-              <span className="ml-auto text-[11px] text-paper/45">保存会把内容写回这张卡</span>
+              <span className="ml-auto text-[11px] text-oncanvas/45">保存会把内容写回这张卡</span>
             </div>
           )}
 
           <div className="flex items-center justify-between">
-            <h2 className="text-[11px] tracking-[0.18em] text-paper/45">核对</h2>
+            <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">核对</h2>
             <button
               type="button"
               onClick={() => {
                 setDraft(null);
                 setScanned(null);
               }}
-              className="text-[11px] text-paper/35 hover:text-paper/60"
+              className="text-[11px] text-oncanvas/35 hover:text-oncanvas/60"
             >
               清空
             </button>
@@ -305,7 +342,7 @@ export function Capture() {
             <input
               value={draft.title}
               onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-              className="w-full border border-paper/20 bg-transparent px-3 py-2 text-[14px] text-paper focus:border-paper/40"
+              className="w-full border border-line/20 bg-transparent px-3 py-2 text-[14px] text-oncanvas focus:border-line/40"
             />
           </Field>
 
@@ -314,7 +351,7 @@ export function Capture() {
               <select
                 value={draft.kind}
                 onChange={(e) => setDraft({ ...draft, kind: e.target.value as Kind })}
-                className="w-full border border-paper/20 bg-mat px-2 py-2 text-[13px] text-paper"
+                className="w-full border border-line/20 bg-canvas px-2 py-2 text-[13px] text-oncanvas"
               >
                 <option value="short">短期</option>
                 <option value="long">长期</option>
@@ -324,7 +361,7 @@ export function Capture() {
               <select
                 value={draft.status}
                 onChange={(e) => setDraft({ ...draft, status: e.target.value as Status })}
-                className="w-full border border-paper/20 bg-mat px-2 py-2 text-[13px] text-paper"
+                className="w-full border border-line/20 bg-canvas px-2 py-2 text-[13px] text-oncanvas"
               >
                 {Object.entries(STATUS_LABEL).map(([k, v]) => (
                   <option key={k} value={k}>
@@ -337,7 +374,7 @@ export function Capture() {
               <input
                 value={draft.due}
                 onChange={(e) => setDraft({ ...draft, due: e.target.value })}
-                className="w-full border border-paper/20 bg-transparent px-2 py-2 font-mono text-[13px] text-paper"
+                className="w-full border border-line/20 bg-transparent px-2 py-2 font-mono text-[13px] text-oncanvas"
               />
             </Field>
             <Field label="用时（分）">
@@ -350,7 +387,7 @@ export function Capture() {
                     estimate_min: e.target.value === '' ? '' : Number(e.target.value.replace(/\D/g, '')),
                   })
                 }
-                className="w-full border border-paper/20 bg-transparent px-2 py-2 font-mono text-[13px] text-paper"
+                className="w-full border border-line/20 bg-transparent px-2 py-2 font-mono text-[13px] text-oncanvas"
               />
             </Field>
           </div>
@@ -360,7 +397,7 @@ export function Capture() {
               value={draft.description}
               onChange={(e) => setDraft({ ...draft, description: e.target.value })}
               rows={2}
-              className="w-full resize-y border border-paper/20 bg-transparent px-3 py-2 text-[13px] leading-relaxed text-paper focus:border-paper/40"
+              className="w-full resize-y border border-line/20 bg-transparent px-3 py-2 text-[13px] leading-relaxed text-oncanvas focus:border-line/40"
             />
           </Field>
 
@@ -369,14 +406,14 @@ export function Capture() {
               <input
                 value={draft.materials}
                 onChange={(e) => setDraft({ ...draft, materials: e.target.value })}
-                className="w-full border border-paper/20 bg-transparent px-3 py-2 text-[13px] text-paper"
+                className="w-full border border-line/20 bg-transparent px-3 py-2 text-[13px] text-oncanvas"
               />
             </Field>
             <Field label="备注">
               <input
                 value={draft.notes}
                 onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-                className="w-full border border-paper/20 bg-transparent px-3 py-2 text-[13px] text-paper"
+                className="w-full border border-line/20 bg-transparent px-3 py-2 text-[13px] text-oncanvas"
               />
             </Field>
           </div>
@@ -385,7 +422,7 @@ export function Capture() {
             type="button"
             onClick={save}
             disabled={busy}
-            className="mt-1 self-start bg-seal px-5 py-2.5 text-[13px] font-medium text-paper hover:bg-seal/90 disabled:opacity-50"
+            className="mt-1 self-start bg-seal px-5 py-2.5 text-[13px] font-medium text-white hover:bg-seal/90 disabled:opacity-50"
           >
             {scanned ? '保存并写回这张卡' : '保存并生成短码'}
           </button>
@@ -398,7 +435,7 @@ export function Capture() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[10px] tracking-[0.16em] text-paper/40">{label}</span>
+      <span className="text-[10px] tracking-[0.16em] text-oncanvas/40">{label}</span>
       {children}
     </label>
   );
@@ -462,9 +499,9 @@ function CameraShot({
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/85 p-4 backdrop-blur-sm">
       <div className="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-3">
-        <div className="flex items-center justify-between text-[12px] text-paper/60">
+        <div className="flex items-center justify-between text-[12px] text-oncanvas/60">
           <span>对准纸卡</span>
-          <button type="button" onClick={onClose} className="border border-paper/25 px-3 py-1.5">
+          <button type="button" onClick={onClose} className="border border-line/25 px-3 py-1.5">
             取消
           </button>
         </div>
