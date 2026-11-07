@@ -60,18 +60,12 @@ export function Landing({ code }: { code: string }) {
 
         {!loading && error && (
           <div className="bg-paper px-6 py-10 text-ink trim">
-            <p className="text-[15px] font-semibold">
-              {notFound ? '这张卡已经不在系统里了' : '这张卡没对上号'}
-            </p>
+            <p className="text-[15px] font-semibold">这张卡不在系统里了</p>
             <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">
-              {notFound
-                ? '它可能被删掉了，或者换了一版纸卡。手上这张纸可以留着当便签用。'
-                : error}
+              可能它已经被删掉（纸上这张就留作便签），也可能短码印错了、或者数据库还没导入。
             </p>
-            {!notFound && (
-              <p className="mt-4 text-[12px] leading-relaxed text-ink-soft">
-                可能原因：短码印错、数据库里还没导入这张卡、或者 PocketBase 没启动。
-              </p>
+            {!notFound && error && !error.startsWith('这个短码') && (
+              <p className="mt-3 font-mono text-[11px] leading-relaxed text-ink-soft/70">{error}</p>
             )}
             <Link
               to="/"
