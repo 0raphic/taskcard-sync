@@ -98,18 +98,50 @@ public class SettingsFragment extends Fragment {
         theme.setOnCheckedChangeListener((g, checkedId) -> {
             int idx = checkedId - 1000;
             Api.prefs(c).edit().putInt("theme", idx).apply();
+
+            // 切完会 recreate；先把窗口和根视图刷成目标纸色，重建那一帧就不会闪白
+            int bg = 0xFFFFFFFF;
+            if (idx == 2) bg = 0xFF0E0E0D;
+            else if (idx == 0) {
+                boolean night = (getResources().getConfiguration().uiMode
+                        & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                        == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+                bg = night ? 0xFF0E0E0D : 0xFFFFFFFF;
+            }
+            if (getActivity() != null) {
+                getActivity().getWindow().setBackgroundDrawable(
+                        new android.graphics.drawable.ColorDrawable(bg));
+                getActivity().getWindow().getDecorView().setBackgroundColor(bg);
+            }
+
             AppCompatDelegate.setDefaultNightMode(idx == 1 ? AppCompatDelegate.MODE_NIGHT_NO
                     : idx == 2 ? AppCompatDelegate.MODE_NIGHT_YES
                     : AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         });
         root.addView(theme);
 
-        root.addView(Ui.label(c, "账号系统（还没接）"), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        TextView acc = Ui.label(c, "写操作口令已停用：现在同一 Wi-Fi 下的设备都能直接改数据。"
-                + "下一步换成账号登录，每张卡记录是谁改的；在那之前别把地址开到公网。");
+        root.addView(Ui.label(c, "账号"));
+        TextView acc = Ui.label(c, Api.token(c).isEmpty()
+                ? "还没登录。"
+                : "已登录（token 存在这台手机上）。纸卡扫码页不用登录，谁拿着卡都能改那张卡。");
         acc.setPadding(0, Ui.dp(c, 6), 0, 0);
         root.addView(acc);
+
+        if (!Api.token(c).isEmpty()) {
+            com.google.android.material.button.MaterialButton logout =
+                    new com.google.android.material.button.MaterialButton(c, null,
+                            com.google.android.material.R.attr.materialButtonOutlinedStyle);
+            logout.setText("退出登录");
+            LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            llp.topMargin = Ui.dp(c, 10);
+            root.addView(logout, llp);
+            logout.setOnClickListener(v -> {
+                Api.setToken(c, "");
+                Ui.toast(c, "已退出，重新登录");
+                if (getActivity() instanceof MainActivity) ((MainActivity) getActivity()).promptLogin();
+            });
+        }
 
         MaterialButton web = new MaterialButton(c, null,
                 com.google.android.material.R.attr.materialButtonOutlinedStyle);

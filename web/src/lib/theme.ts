@@ -37,11 +37,15 @@ export function applyTheme(mode: ThemeMode) {
   // 换肤瞬间关掉所有过渡，避免背景/文字在两种颜色之间“闪”一下
   root.classList.add('theme-swap');
   root.dataset.theme = theme;
-  root.style.colorScheme = theme;
+
+  // 只切 dataset：整页颜色都来自 CSS 变量，一次样式计算就能完成。
+  // 不碰 colorScheme —— 浏览器切 UA 配色会触发整页重绘，那才是白闪的来源。
+  const canvas = theme === 'dark' ? '#0e0e0d' : '#ffffff';
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#0e0e0d' : '#ffffff');
+  if (meta) meta.setAttribute('content', canvas);
+
   window.clearTimeout(swapTimer);
-  swapTimer = window.setTimeout(() => root.classList.remove('theme-swap'), 240);
+  swapTimer = window.setTimeout(() => root.classList.remove('theme-swap'), 260);
 }
 
 export function saveMode(mode: ThemeMode) {

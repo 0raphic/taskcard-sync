@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 /* 瑞士风：白纸黑字，红色只做强调；浅色为默认，深色是同一套网格的反相 */
+html {
+  /* 页面最底层永远是当前主题的纸色：切换时不会露出浏览器默认的白 */
+  background: var(--canvas);
+  color: var(--ink);
+}
+
 :root {
   --canvas: #ffffff;
   --canvas-soft: #f5f5f3;
@@ -16,9 +22,12 @@
   --moss: #2f6b46;
   --amber: #b06a00;
   color-scheme: light;
+  background: var(--canvas);
+  scrollbar-color: rgba(10, 10, 10, 0.3) transparent;
 }
 
 :root[data-theme="dark"] {
+  scrollbar-color: rgba(244, 243, 239, 0.28) transparent;
   --canvas: #0e0e0d;
   --canvas-soft: #171716;
   --surface: #141413;
@@ -32,7 +41,8 @@
   --seal: #ef5347;
   --moss: #6fae86;
   --amber: #e0a33a;
-  color-scheme: dark;
+  /* 刻意不切 color-scheme：色板全由 CSS 变量控制，切 UA 模式反而会整页重绘闪一下 */
+  background: var(--canvas);
 }
 
 @theme {

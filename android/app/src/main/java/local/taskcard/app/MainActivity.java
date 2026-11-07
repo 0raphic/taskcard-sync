@@ -58,6 +58,7 @@ public class MainActivity extends AppCompatActivity {
         root.addView(nav, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        root.setBackgroundColor(Ui.attr(this, com.google.android.material.R.attr.colorSurface));
         setContentView(root);
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
