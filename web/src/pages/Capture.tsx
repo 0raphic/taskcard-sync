@@ -236,7 +236,7 @@ export function Capture() {
           type="button"
           onClick={structure}
           disabled={busy || !text.trim()}
-          className="bg-seal px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:brightness-110 disabled:opacity-40"
+          className="bg-seal px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-transparent disabled:text-oncanvas/35 disabled:outline disabled:outline-1 disabled:-outline-offset-1 disabled:outline-line"
         >
           {busy ? '解析中…' : '解析成任务'}
         </button>
