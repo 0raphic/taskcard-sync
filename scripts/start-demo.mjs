@@ -1,7 +1,7 @@
 // 一键启动：PocketBase → 建表/导数据 → 网页服务器 → 打开浏览器
 // 用法：node scripts/start-demo.mjs [--no-open] [--check]
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 
@@ -110,12 +110,46 @@ if (count.totalItems === 0) {
   });
 }
 
+
+// 源码比 dist 新就重建：否则改了代码双击启动，看到的还是旧页面
+function newestMtime(target) {
+  let newest = 0;
+  const walk = (p) => {
+    let st;
+    try {
+      st = statSync(p);
+    } catch {
+      return;
+    }
+    if (st.isDirectory()) {
+      for (const name of readdirSync(p)) {
+        if (name === 'node_modules' || name === 'dist') continue;
+        walk(join(p, name));
+      }
+      return;
+    }
+    newest = Math.max(newest, st.mtimeMs);
+  };
+  walk(target);
+  return newest;
+}
+
+function needsBuild() {
+  const dist = join(ROOT, 'web/dist/index.html');
+  if (!existsSync(dist)) return true;
+  const built = statSync(dist).mtimeMs;
+  return ['web/src', 'web/index.html', 'web/vite.config.ts', 'web/package.json', 'web/index.css']
+    .map((rel) => join(ROOT, rel))
+    .filter((p) => existsSync(p))
+    .some((p) => newestMtime(p) > built);
+}
+
 console.log('[demo] 检查网页服务器…');
 let webRunning = await up(`http://127.0.0.1:${WEB_PORT}/`);
 
 if (!webRunning) {
-  if (!existsSync(join(ROOT, 'web/dist/index.html'))) {
-    console.log('[demo] 还没有构建产物，先构建…');
+  if (needsBuild()) {
+    console.log('[demo] 构建产物不存在或比源码旧，先构建…');
     await new Promise((resolve, reject) => {
       const build = start('pnpm', ['build'], 'build');
       build.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('build failed'))));

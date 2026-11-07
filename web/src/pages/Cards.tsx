@@ -173,6 +173,25 @@ export function Cards() {
     }
   }
 
+  async function restore(code: string) {
+    setBusy(`restore:${code}`);
+    setFlash(null);
+    try {
+      const res = await fetch('/ds-api/cards.restore', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const b = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !b.ok) throw new Error(b.error || `HTTP ${res.status}`);
+      setFlash(`${code} 已恢复，这张纸可以继续扫`);
+    } catch (e) {
+      setFlash(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function reprint(codes: string[], fill = false) {
     setBusy(`reprint:${codes.join(',')}`);
     setFlash(null);
@@ -185,10 +204,12 @@ export function Cards() {
       await openPdf(res);
       const filled = Number(res.headers.get('x-fill-count') || 0);
       const total = Number(res.headers.get('x-card-count') || codes.length);
+      const skipped = (res.headers.get('x-skipped-codes') || '').split(',').filter(Boolean);
+      const tail = skipped.length ? `；${skipped.join('、')} 没印（已作废或不在库里）` : '';
       setFlash(
-        filled > 0
-          ? `补印 ${codes.length} 张 + 新卡 ${filled} 张，凑满一页（共 ${total} 张），短码不变`
-          : `补印 ${codes.length} 张，短码不变`,
+        (filled > 0
+          ? `补印 ${codes.length - skipped.length} 张 + 新卡 ${filled} 张，凑满一页（共 ${total} 张），短码不变`
+          : `补印 ${codes.length - skipped.length} 张，短码不变`) + tail,
       );
       setPicked([]);
     } catch (e) {
@@ -380,7 +401,7 @@ export function Cards() {
                     补印
                   </button>
                 )}
-                {!dead && (
+                {!dead ? (
                   <button
                     type="button"
                     onClick={() => revoke(row.code)}
@@ -388,6 +409,15 @@ export function Cards() {
                     className="border border-seal/30 px-2 py-1 text-[11px] text-seal/85 hover:border-seal/60 disabled:opacity-40"
                   >
                     作废
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => restore(row.code)}
+                    disabled={busy !== null}
+                    className="border border-line/25 px-2 py-1 text-[11px] text-oncanvas/60 hover:border-line/50 disabled:opacity-40"
+                  >
+                    恢复
                   </button>
                 )}
               </div>

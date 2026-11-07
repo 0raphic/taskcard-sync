@@ -629,6 +629,40 @@ app.post('/ds-api/cards.revoke', async (req, res) => {
   }
   res.json({ ok: true, revoked: done.length, codes: done, failed });
 });
+// 把作废的卡恢复成可用（作废是软删除，能反悔）
+app.post('/ds-api/cards.restore', async (req, res) => {
+  const list = Array.isArray(req.body?.codes)
+    ? req.body.codes.map((c) => String(c || '').trim()).filter(Boolean)
+    : [String(req.body?.code || '').trim()].filter(Boolean);
+  const codes = [...new Set(list)].slice(0, 200);
+  if (!codes.length) return res.status(400).json({ ok: false, error: '要指定短码' });
+
+  try {
+    const restored = [];
+    const failed = [];
+    for (const code of codes) {
+      const lq = await pbReq(
+        `/api/collections/short_links/records?perPage=1&filter=${encodeURIComponent(`code="${code}"`)}`,
+      );
+      const link = lq.json?.items?.[0];
+      if (!link) {
+        failed.push({ code, error: '不在系统里' });
+        continue;
+      }
+      const r = await pbReq(`/api/collections/short_links/records/${link.id}`, {
+        method: 'PATCH',
+        body: { active: true },
+      });
+      if (r.ok) restored.push(code);
+      else failed.push({ code, error: '恢复失败' });
+    }
+    if (!restored.length) return res.status(404).json({ ok: false, error: '这些短码都没恢复', failed });
+    return res.json({ ok: true, restored: restored.length, codes: restored, failed });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 
 // 补印：按原来的短码重新出空白卡（码不变，纸换了）；可以一次补一批
 
@@ -663,19 +697,34 @@ app.post('/ds-api/cards.reprint', async (req, res) => {
   try {
     const tasks = [];
     const codes = new Map();
+    const skipped = [];
     for (const code of list) {
       const lq = await pbReq(
         `/api/collections/short_links/records?perPage=1&filter=${encodeURIComponent(`code="${code}"`)}&expand=task`,
       );
       const link = lq.json?.items?.[0];
-      if (!link) return res.status(404).json({ ok: false, error: `短码 ${code} 不在系统里` });
+      if (!link) {
+        skipped.push({ code, reason: '不在系统里' });
+        continue;
+      }
       if (link.active === false) {
-        return res.status(400).json({ ok: false, error: `短码 ${code} 已作废，先恢复再补印` });
+        skipped.push({ code, reason: '已作废' });
+        continue;
       }
       const task = link.expand?.task ?? (await pbReq(`/api/collections/tasks/records/${link.task}`)).json;
-      if (!task) return res.status(404).json({ ok: false, error: `短码 ${code} 的任务不在了` });
+      if (!task) {
+        skipped.push({ code, reason: '任务不在了' });
+        continue;
+      }
       tasks.push(task);
       codes.set(task.id, code);
+    }
+    if (!tasks.length) {
+      return res.status(404).json({
+        ok: false,
+        error: `这些短码都没法补印：${skipped.map((x) => `${x.code}（${x.reason}）`).join('、')}`,
+        skipped,
+      });
     }
 
     // 可选：用新空白卡把这一页的剩下的位置填满（补 1 张也照样出一整页 8 格）
@@ -705,6 +754,7 @@ app.post('/ds-api/cards.reprint', async (req, res) => {
     res.setHeader('x-card-count', String(payload.tasks.length));
     res.setHeader('x-fill-count', String(filled));
     res.setHeader('x-card-codes', payload.tasks.map((t) => codes.get(t.id)).filter(Boolean).join(','));
+    if (skipped.length) res.setHeader('x-skipped-codes', skipped.map((x) => x.code).join(','));
     res.send(out.buffer);
   } catch (e) {
     res.status(500).json({ ok: false, error: e.message });

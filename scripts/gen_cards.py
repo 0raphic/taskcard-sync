@@ -224,6 +224,8 @@ PINK = Color(1.0, 0.36, 0.72)
 PURPLE = Color(0.58, 0.42, 1.0)
 CYAN = Color(0.35, 0.86, 1.0)
 HAIR = HexColor("#111111")
+SWISS_RED = HexColor("#d6362b")
+SWISS_INK = HexColor("#141414")
 
 
 def rule(c, x1, x2, y, w=0.4, color=HAIR):
@@ -263,91 +265,11 @@ def chips(c, x, y, labels, size=5.0, gap=3.0 * mm):
     return cx
 
 
-def crosshair(c, x, y, s=1.6 * mm):
-    c.setStrokeColor(HAIR)
-    c.setLineWidth(0.35)
-    c.line(x - s, y, x + s, y)
-    c.line(x, y - s, x, y + s)
-
-
 def corners(c, x, y, inset=1.6 * mm):
     crosshair(c, x + inset, y + inset, 1.1 * mm)
     crosshair(c, x + CARD_W - inset, y + inset, 1.1 * mm)
     crosshair(c, x + inset, y + CARD_H - inset, 1.1 * mm)
     crosshair(c, x + CARD_W - inset, y + CARD_H - inset, 1.1 * mm)
-
-
-def barcode(c, x, y, w, h, seed_text, gap=0.9 * mm):
-    """确定性伪随机条码 + 三条低饱和镭射渐变。"""
-    seed = sum(ord(ch) * (i + 7) for i, ch in enumerate(seed_text)) or 7
-    bars = []
-    used = 0.0
-    i = 0
-    while used < w - gap:
-        seed = (seed * 1103515245 + 12345) % 2147483648
-        bw = [0.22, 0.34, 0.5][seed % 3] * mm
-        if used + bw > w - gap:
-            break
-        bars.append((x + used, bw, (seed >> 5) % 4 != 0))
-        used += bw + (0.26 + 0.14 * (i % 3)) * mm
-        i += 1
-    for bx, bw, on in bars:
-        if on:
-            c.setFillColor(HAIR)
-            c.rect(bx, y, bw, h, stroke=0, fill=1)
-    # 镭射条纹：低饱和、半透明，压在条码上
-    for j, col in enumerate((PINK, PURPLE, CYAN)):
-        c.saveState()
-        c.setFillAlpha(0.32)
-        c.setFillColor(col)
-        c.rect(x + 2 * mm, y + h * (0.2 + j * 0.26), w * 0.62, 0.32 * mm, stroke=0, fill=1)
-        c.restoreState()
-
-
-def pixels(c, x, y, cols=8, rows=3, step=1.15 * mm, size=0.62 * mm):
-    c.setFillColor(HAIR)
-    for ix in range(cols):
-        for iy in range(rows):
-            if (ix * 5 + iy * 3 + ix * iy) % 4 == 0:
-                c.rect(x + ix * step, y + iy * step, size, size, stroke=0, fill=1)
-
-
-def signal(c, x, y, n=18, step=1.35 * mm, h=3.6 * mm, seed=7):
-    """一排高低不一的竖线，像电平表/数据条，替代 ASCII 装饰。"""
-    c.setFillColor(HAIR)
-    k = seed or 7
-    for i in range(n):
-        k = (k * 1103515245 + 12345) % 2147483648
-        bh = h * (0.25 + ((k >> 9) % 100) / 130)
-        c.rect(x + i * step, y, 0.55 * mm, bh, stroke=0, fill=1)
-
-
-def laser_band(c, x, y, w, h=1.3 * mm):
-    for j, col in enumerate((PINK, PURPLE, CYAN)):
-        c.saveState()
-        c.setFillAlpha(0.4)
-        c.setFillColor(col)
-        c.rect(x + w * (0.06 + j * 0.12), y, w * 0.42, h, stroke=0, fill=1)
-        c.restoreState()
-
-
-def serial(code: str) -> str:
-    h = sum(ord(ch) for ch in code) * 97 % 10000
-    return f"TC/{code.upper()}/{h:04d}"
-
-
-def xxy(c, x, y, size=12, color=HAIR, track=0.06):
-    """几何字标：手动加字距。"""
-    cx = x
-    for ch in "XXY":
-        c.setFont(FONT_B, size)
-        c.setFillColor(color)
-        c.drawString(cx, y, ch)
-        cx += pdfmetrics.stringWidth(ch, FONT_B, size) + size * track
-
-
-SWISS_RED = HexColor("#d6362b")
-SWISS_INK = HexColor("#141414")
 
 
 def track_text(c, s, x, y, size, color=SOFT, track=1.1, font=None):
