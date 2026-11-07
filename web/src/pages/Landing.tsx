@@ -3,6 +3,7 @@ import { TaskSheet } from '../components/TaskSheet';
 import { logProgress, message, useShortLink, useUpdateTask } from '../lib/data';
 import { Link, navigate } from '../lib/router';
 import { STATUS_LABEL, type Status } from '../lib/types';
+import { fileToJpegDataUrl } from '../lib/image';
 
 export function Landing({ code }: { code: string }) {
   const { loading, task, link, error, notFound, revoked } = useShortLink(code);
@@ -46,6 +47,87 @@ export function Landing({ code }: { code: string }) {
       setFlash(`没改成：${message(e)}`);
     } finally {
       setPending(null);
+    }
+  }
+
+  const [scanning, setScanning] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [fields, setFields] = useState<{
+    title?: string;
+    due?: string;
+    estimate_min?: number | null;
+    description?: string;
+    materials?: string;
+    notes?: string;
+    progress?: number | null;
+  } | null>(null);
+
+  async function fromPhoto(file: File) {
+    setScanning(true);
+    setFlash(null);
+    try {
+      const image = await fileToJpegDataUrl(file);
+      const res = await fetch('/ds-api/scan', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image, code }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        fields?: Record<string, unknown>;
+      };
+      if (!res.ok || !body.ok) throw new Error(body.error || `识别失败 HTTP ${res.status}`);
+      const f = body.fields ?? {};
+      setFields({
+        title: typeof f.title === 'string' ? f.title : '',
+        due: typeof f.due === 'string' ? f.due : '',
+        estimate_min: typeof f.estimate_min === 'number' ? f.estimate_min : null,
+        description: typeof f.description === 'string' ? f.description : '',
+        materials: typeof f.materials === 'string' ? f.materials : '',
+        notes: typeof f.notes === 'string' ? f.notes : '',
+        progress: typeof f.progress === 'number' ? f.progress : null,
+      });
+      setFlash('认出来了，核对一下再保存');
+    } catch (e) {
+      setFlash(`没认出来：${message(e)}`);
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function saveFields() {
+    if (!task || !fields) return;
+    setSaving(true);
+    setFlash(null);
+    try {
+      // 只写「卡面上确实读到了」的字段：空白项保留系统里原来的值，避免误清空
+      const payload: Record<string, unknown> = {};
+      const title = (fields.title ?? '').trim();
+      const due = (fields.due ?? '').trim();
+      const desc = (fields.description ?? '').trim();
+      const materials = (fields.materials ?? '').trim();
+      const notes = (fields.notes ?? '').trim();
+      if (title) payload.title = title;
+      if (due) payload.due = due;
+      if (fields.estimate_min) payload.estimate_min = fields.estimate_min;
+      if (desc) payload.description = desc;
+      if (materials) payload.materials = materials;
+      if (notes) payload.notes = notes;
+      if (task.kind === 'long' && fields.progress != null) {
+        payload.progress = Math.max(0, Math.min(100, fields.progress));
+      }
+      if (Object.keys(payload).length === 0) {
+        setFlash('卡面上没读到内容，可以把字写清楚一点再拍');
+        return;
+      }
+      await update(task.id, payload);
+      setFields(null);
+      setFlash('已经写回这张卡，看板同步更新了');
+    } catch (e) {
+      setFlash(`没写回去：${message(e)}`);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -167,39 +249,147 @@ export function Landing({ code }: { code: string }) {
           </section>
         )}
 
-        {task && !reviewing && (
+        {task && !fields && (
           <div className="mt-4 flex flex-col gap-2">
-            <button
-              type="button"
-              disabled={pending !== null}
-              onClick={() => act('done')}
-              className="w-full bg-seal px-4 py-4 text-[15px] font-semibold tracking-[0.1em] text-white transition-colors hover:bg-seal/90 disabled:opacity-50"
-            >
-              完成
-            </button>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={pending !== null}
-                onClick={() => act('doing')}
-                className="border border-line/25 px-4 py-3 text-[13px] text-oncanvas/85 transition-colors hover:border-line/50 disabled:opacity-50"
-              >
-                正在进行
-              </button>
-              <button
-                type="button"
-                disabled={pending !== null}
-                onClick={() => act('paused')}
-                className="border border-line/25 px-4 py-3 text-[13px] text-oncanvas/85 transition-colors hover:border-line/50 disabled:opacity-50"
-              >
-                先搁置
+            <label className={`flex w-full cursor-pointer items-center justify-center gap-2 bg-seal px-4 py-4 text-[15px] font-semibold tracking-[0.06em] text-white transition-colors hover:bg-seal/90 ${scanning ? 'opacity-60' : ''}`}>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                disabled={scanning}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) void fromPhoto(f);
+                }}
+              />
+              {scanning ? '识别中…' : '拍一张，更新这张卡'}
+            </label>
+            <label className="flex w-full cursor-pointer items-center justify-center border border-line/25 px-4 py-3 text-[13px] text-oncanvas/85 transition-colors hover:border-line/50">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={scanning}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) void fromPhoto(f);
+                }}
+              />
+              从相册选一张
+            </label>
+            <p className="px-1 text-[11px] leading-relaxed text-oncanvas/40">
+              拍整张纸卡（右上角二维码要清楚）。认出卡面后核对一遍，再写回系统。
+            </p>
+          </div>
+        )}
+
+        {task && fields && (
+          <section className="mt-4 border border-seal/30 bg-surface px-4 py-4 text-ink">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-semibold">认出卡面内容，核对一下</p>
+              <button type="button" onClick={() => setFields(null)} className="text-[11px] text-ink-soft underline underline-offset-4">
+                取消
               </button>
             </div>
+            <div className="mt-3 flex flex-col gap-2.5">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">标题</span>
+                <input
+                  value={fields.title ?? ''}
+                  onChange={(e) => setFields({ ...fields, title: e.target.value })}
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">截止</span>
+                  <input
+                    value={fields.due ?? ''}
+                    onChange={(e) => setFields({ ...fields, due: e.target.value })}
+                    placeholder="MM-DD"
+                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">用时（分）</span>
+                  <input
+                    value={fields.estimate_min ?? ''}
+                    onChange={(e) => setFields({ ...fields, estimate_min: e.target.value === '' ? null : Number(e.target.value) })}
+                    inputMode="numeric"
+                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                  />
+                </label>
+              </div>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">描述</span>
+                <textarea
+                  value={fields.description ?? ''}
+                  onChange={(e) => setFields({ ...fields, description: e.target.value })}
+                  rows={2}
+                  className="resize-none border border-ink/15 px-2 py-1.5 text-[12px] focus:border-ink/35"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">材料</span>
+                  <input
+                    value={fields.materials ?? ''}
+                    onChange={(e) => setFields({ ...fields, materials: e.target.value })}
+                    className="border border-ink/15 px-2 py-1.5 text-[12px] focus:border-ink/35"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">备注</span>
+                  <input
+                    value={fields.notes ?? ''}
+                    onChange={(e) => setFields({ ...fields, notes: e.target.value })}
+                    className="border border-ink/15 px-2 py-1.5 text-[12px] focus:border-ink/35"
+                  />
+                </label>
+              </div>
+              {task.kind === 'long' && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">进度 %</span>
+                  <input
+                    value={fields.progress ?? ''}
+                    onChange={(e) => setFields({ ...fields, progress: e.target.value === '' ? null : Number(e.target.value) })}
+                    inputMode="numeric"
+                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                  />
+                </label>
+              )}
+            </div>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void saveFields()}
+              className="mt-3 w-full bg-seal px-3 py-2.5 text-[13px] font-medium text-white disabled:opacity-50"
+            >
+              {saving ? '保存中…' : '写回这张卡'}
+            </button>
+          </section>
+        )}
+
+        {task && !fields && (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-1 text-[11px] text-oncanvas/45">
+            <span>或手动改状态：</span>
+            <button type="button" disabled={pending !== null} onClick={() => act('doing')} className="underline underline-offset-4 hover:text-oncanvas/80">
+              进行中
+            </button>
+            <button type="button" disabled={pending !== null} onClick={() => act('paused')} className="underline underline-offset-4 hover:text-oncanvas/80">
+              搁置
+            </button>
+            <button type="button" disabled={pending !== null} onClick={() => act('done')} className="underline underline-offset-4 hover:text-oncanvas/80">
+              完成
+            </button>
           </div>
         )}
 
         {task && reviewing && (
-          <div className="mt-4 flex flex-col gap-2 border border-seal/30 bg-surface px-4 py-4 text-ink">
+          <div className="mt-3 flex flex-col gap-2 border border-seal/30 bg-surface px-4 py-4 text-ink">
             <p className="text-[13px] font-semibold">收尾时说一句</p>
             <p className="text-[11px] leading-relaxed text-ink-soft">
               这一步卡了多久、为什么、下次怎么改——写一句就够，跳过也行。

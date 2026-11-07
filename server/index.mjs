@@ -750,19 +750,22 @@ app.post('/ds-api/scan', async (req, res) => {
   }
 
   try {
-    // 1) 先把卡片编号读出来
-    const qr = await callPythonJson('decode_qr.py', { image }, 20000);
-    if (!qr.ok) return res.status(502).json({ ok: false, error: `扫码失败：${qr.error}` });
-    const codes = Array.isArray(qr.codes) ? qr.codes : [];
-    if (!codes.length) {
-      return res.status(422).json({
-        ok: false,
-        error: '照片里没找到二维码。把整张卡拍全（右上角二维码要清楚），别只拍文字。',
-      });
-    }
-    const code = codes.map(codeFromQr).find(Boolean);
-    if (!code) {
-      return res.status(422).json({ ok: false, error: '扫到的不是这张卡片的二维码（内容不是 /t/<短码>）' });
+    // 1) 卡片编号：落地页已经知道短码就直接用，否则从照片里解二维码
+    let code = String(req.body?.code ?? '').trim();
+    if (!/^[A-Za-z0-9]{4,12}$/.test(code)) {
+      const qr = await callPythonJson('decode_qr.py', { image }, 20000);
+      if (!qr.ok) return res.status(502).json({ ok: false, error: `扫码失败：${qr.error}` });
+      const codes = Array.isArray(qr.codes) ? qr.codes : [];
+      if (!codes.length) {
+        return res.status(422).json({
+          ok: false,
+          error: '照片里没找到二维码。把整张卡拍全（右上角二维码要清楚），别只拍文字。',
+        });
+      }
+      code = codes.map(codeFromQr).find(Boolean) || '';
+      if (!code) {
+        return res.status(422).json({ ok: false, error: '扫到的不是这张卡片的二维码（内容不是 /t/<短码>）' });
+      }
     }
 
     // 2) 码 → 卡片
