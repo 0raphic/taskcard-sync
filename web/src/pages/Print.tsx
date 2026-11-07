@@ -62,7 +62,7 @@ function CardPreview({ kind }: { kind: Kind }) {
             <span className="mt-0.5 font-mono text-[7px] text-ink-soft">A7K2m9</span>
           </div>
         </div>
-        <div className="mt-2 flex flex-col gap-[5px]">
+        <div className="mt-2 flex h-[76%] flex-col justify-between">
           {fields.map(([name]) => (
             <div key={name} className="flex items-baseline gap-1.5">
               <span className="w-[52px] shrink-0 text-[7.5px] text-ink-soft">{name}</span>
