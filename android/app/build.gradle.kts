@@ -3,6 +3,7 @@ plugins {
 }
 
 android {
+    buildFeatures { buildConfig = true }
     namespace = "local.taskcard.app"
     compileSdk = 35
 
@@ -10,8 +11,8 @@ android {
         applicationId = "local.taskcard.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 9
-        versionName = "2.5.0"
+        versionCode = 12
+        versionName = "2.6.2"
     }
 
     signingConfigs {

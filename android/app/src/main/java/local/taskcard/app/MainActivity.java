@@ -27,6 +27,11 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        int savedMode = Api.prefs(this).getInt("theme", 0);
+        androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+                savedMode == 1 ? androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+                        : savedMode == 2 ? androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+                        : androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         super.onCreate(savedInstanceState);
 
         LinearLayout root = new LinearLayout(this);

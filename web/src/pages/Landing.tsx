@@ -66,12 +66,12 @@ export function Landing({ code }: { code: string }) {
     dod?: string;
     start?: string;
     due?: string;
-    estimate_min?: number | null;
-    description?: string;
+    goal?: string;
     materials?: string;
     notes?: string;
-    progress?: number | null;
-    weekly_hours?: number | null;
+    milestones?: string[];
+    progress?: string | number | null;
+    weekly_hours?: string | number | null;
   } | null>(null);
 
   async function fromPhoto(file: File) {
@@ -91,14 +91,21 @@ export function Landing({ code }: { code: string }) {
       };
       if (!res.ok || !body.ok) throw new Error(body.error || `识别失败 HTTP ${res.status}`);
       const f = body.fields ?? {};
+      // 只带卡面上真有的字段，不再把「用时 / 描述」这类没印在纸上的东西塞进核对面板
+      const str = (k: string) => (typeof f[k] === 'string' ? (f[k] as string) : '');
+      const long = task?.kind === 'long';
       setFields({
-        title: typeof f.title === 'string' ? f.title : '',
-        due: typeof f.due === 'string' ? f.due : '',
-        estimate_min: typeof f.estimate_min === 'number' ? f.estimate_min : null,
-        description: typeof f.description === 'string' ? f.description : '',
-        materials: typeof f.materials === 'string' ? f.materials : '',
-        notes: typeof f.notes === 'string' ? f.notes : '',
-        progress: typeof f.progress === 'number' ? f.progress : null,
+        title: str('title'),
+        priority: str('priority'),
+        dod: str('dod'),
+        start: str('start'),
+        due: str('due'),
+        goal: long ? str('goal') : '',
+        materials: long ? '' : str('materials'),
+        notes: long ? '' : str('notes'),
+        weekly_hours: long && typeof f.weekly_hours === 'number' ? f.weekly_hours : null,
+        progress: long && typeof f.progress === 'number' ? f.progress : null,
+        milestones: long ? ['', '', ''] : [],
       });
       setFlash('认出来了，核对一下再保存');
     } catch (e) {
@@ -117,7 +124,6 @@ export function Landing({ code }: { code: string }) {
       const payload: Record<string, unknown> = {};
       const title = (fields.title ?? '').trim();
       const due = (fields.due ?? '').trim();
-      const desc = (fields.description ?? '').trim();
       const materials = (fields.materials ?? '').trim();
       const notes = (fields.notes ?? '').trim();
       const dod = (fields.dod ?? '').trim();
@@ -125,17 +131,21 @@ export function Landing({ code }: { code: string }) {
       const start = (fields.start ?? '').trim();
       if (title) payload.title = title;
       if (due) payload.due = due;
-      if (fields.estimate_min) payload.estimate_min = fields.estimate_min;
-      if (desc) payload.description = desc;
+      const milestones = (fields.milestones ?? []).map((m) => (m ?? "").trim()).filter(Boolean);
+      if (task.kind === "long" && milestones.length) payload.milestones = milestones;
       if (materials) payload.materials = materials;
       if (notes) payload.notes = notes;
       if (dod) payload.dod = dod;
       if (priority) payload.priority = priority;
       if (start) payload.start = start;
-      if (task.kind === 'long' && fields.weekly_hours) payload.weekly_hours = fields.weekly_hours;
-      if (task.kind === 'long' && fields.progress != null) {
-        payload.progress = Math.max(0, Math.min(100, fields.progress));
+      const weekly = Number(fields.weekly_hours);
+      if (task.kind === 'long' && Number.isFinite(weekly) && weekly > 0) payload.weekly_hours = weekly;
+      const progress = Number(fields.progress);
+      if (task.kind === 'long' && Number.isFinite(progress)) {
+        payload.progress = Math.max(0, Math.min(100, progress));
       }
+      const goal = (fields.goal ?? '').trim();
+      if (task.kind === 'long' && goal) payload.goal = goal;
       if (Object.keys(payload).length === 0) {
         setFlash('卡面上没读到内容，可以把字写清楚一点再拍');
         return;
@@ -348,12 +358,91 @@ export function Landing({ code }: { code: string }) {
                 取消
               </button>
             </div>
+{task.kind === 'long' ? (
             <div className="mt-3 flex flex-col gap-2.5">
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] tracking-[0.14em] text-ink-soft">标题</span>
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">任务名称</span>
                 <input
                   value={fields.title ?? ''}
                   onChange={(e) => setFields({ ...fields, title: e.target.value })}
+                  placeholder=""
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">目标（O）</span>
+                <input
+                  value={fields.goal ?? ''}
+                  onChange={(e) => setFields({ ...fields, goal: e.target.value })}
+                  placeholder="这一季想拿到什么"
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">周期开始（MM-DD）</span>
+                <input
+                  value={fields.start ?? ''}
+                  onChange={(e) => setFields({ ...fields, start: e.target.value })}
+                  placeholder="11-08"
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">周期截止（MM-DD）</span>
+                <input
+                  value={fields.due ?? ''}
+                  onChange={(e) => setFields({ ...fields, due: e.target.value })}
+                  placeholder="12-31"
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                />
+              </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">每周投入（小时）</span>
+                <input
+                  value={fields.weekly_hours ?? ''}
+                  onChange={(e) => setFields({ ...fields, weekly_hours: e.target.value })}
+                  placeholder="6"
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                />
+              </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">进度 %</span>
+                  <input
+                    value={fields.progress ?? ''}
+                    onChange={(e) => setFields({ ...fields, progress: e.target.value === '' ? null : Number(e.target.value) })}
+                    inputMode="numeric"
+                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                  />
+                </label>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">短期里程碑（一行一条）</span>
+                {[0, 1, 2].map((idx) => (
+                  <input
+                    key={idx}
+                    value={fields.milestones?.[idx] ?? ''}
+                    onChange={(e) => {
+                      const next = [...(fields.milestones ?? ['', '', ''])];
+                      next[idx] = e.target.value;
+                      setFields({ ...fields, milestones: next });
+                    }}
+                    placeholder={['第一步', '第二步', '第三步'][idx]}
+                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 flex flex-col gap-2.5">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">任务名称</span>
+                <input
+                  value={fields.title ?? ''}
+                  onChange={(e) => setFields({ ...fields, title: e.target.value })}
+                  placeholder=""
                   className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
                 />
               </label>
@@ -372,95 +461,56 @@ export function Landing({ code }: { code: string }) {
                     <option value="其他">其他</option>
                   </select>
                 </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">完成标准</span>
-                  <input
-                    value={fields.dod ?? ''}
-                    onChange={(e) => setFields({ ...fields, dod: e.target.value })}
-                    placeholder="做到什么程度算完"
-                    className="border border-ink/15 px-2 py-1.5 text-[12px] focus:border-ink/35"
-                  />
-                </label>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">开始</span>
-                  <input
-                    value={fields.start ?? ''}
-                    onChange={(e) => setFields({ ...fields, start: e.target.value })}
-                    placeholder="MM-DD"
-                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">截止</span>
-                  <input
-                    value={fields.due ?? ''}
-                    onChange={(e) => setFields({ ...fields, due: e.target.value })}
-                    placeholder="MM-DD"
-                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">用时（分）</span>
-                  <input
-                    value={fields.estimate_min ?? ''}
-                    onChange={(e) => setFields({ ...fields, estimate_min: e.target.value === '' ? null : Number(e.target.value) })}
-                    inputMode="numeric"
-                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
-                  />
-                </label>
-              </div>
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] tracking-[0.14em] text-ink-soft">描述</span>
-                <textarea
-                  value={fields.description ?? ''}
-                  onChange={(e) => setFields({ ...fields, description: e.target.value })}
-                  rows={2}
-                  className="resize-none border border-ink/15 px-2 py-1.5 text-[12px] focus:border-ink/35"
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">完成标准</span>
+                <input
+                  value={fields.dod ?? ''}
+                  onChange={(e) => setFields({ ...fields, dod: e.target.value })}
+                  placeholder="做到什么程度算完"
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
                 />
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">材料</span>
-                  <input
-                    value={fields.materials ?? ''}
-                    onChange={(e) => setFields({ ...fields, materials: e.target.value })}
-                    className="border border-ink/15 px-2 py-1.5 text-[12px] focus:border-ink/35"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">备注</span>
-                  <input
-                    value={fields.notes ?? ''}
-                    onChange={(e) => setFields({ ...fields, notes: e.target.value })}
-                    className="border border-ink/15 px-2 py-1.5 text-[12px] focus:border-ink/35"
-                  />
-                </label>
               </div>
-              {task.kind === 'long' && (
-                <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">进度 %</span>
-                  <input
-                    value={fields.progress ?? ''}
-                    onChange={(e) => setFields({ ...fields, progress: e.target.value === '' ? null : Number(e.target.value) })}
-                    inputMode="numeric"
-                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10px] tracking-[0.14em] text-ink-soft">周投入（小时）</span>
-                  <input
-                    value={fields.weekly_hours ?? ''}
-                    onChange={(e) => setFields({ ...fields, weekly_hours: e.target.value === '' ? null : Number(e.target.value) })}
-                    inputMode="numeric"
-                    className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
-                  />
-                </label>
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">开始（MM-DD）</span>
+                <input
+                  value={fields.start ?? ''}
+                  onChange={(e) => setFields({ ...fields, start: e.target.value })}
+                  placeholder="11-08"
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">截止（MM-DD）</span>
+                <input
+                  value={fields.due ?? ''}
+                  onChange={(e) => setFields({ ...fields, due: e.target.value })}
+                  placeholder="11-12"
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                />
+              </label>
+              </div>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">材料</span>
+                <input
+                  value={fields.materials ?? ''}
+                  onChange={(e) => setFields({ ...fields, materials: e.target.value })}
+                  placeholder="打印店、U 盘"
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] tracking-[0.14em] text-ink-soft">备注</span>
+                <input
+                  value={fields.notes ?? ''}
+                  onChange={(e) => setFields({ ...fields, notes: e.target.value })}
+                  placeholder="先试印一张"
+                  className="border border-ink/15 px-2 py-1.5 text-[13px] focus:border-ink/35"
+                />
+              </label>
             </div>
+          )}
             <button
               type="button"
               disabled={saving}

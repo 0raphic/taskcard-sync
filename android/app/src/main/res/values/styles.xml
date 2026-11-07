@@ -26,6 +26,7 @@
         <item name="colorSurfaceContainerHighest">#FFFFFF</item>
         <item name="colorSurfaceContainerLow">#FFFFFF</item>
         <item name="android:windowBackground">@color/canvas</item>
+        <item name="android:windowSplashScreenBackground">@color/canvas</item>
         <item name="android:statusBarColor">@color/canvas</item>
         <item name="android:navigationBarColor">@color/canvas</item>
         <item name="android:windowLightStatusBar">true</item>

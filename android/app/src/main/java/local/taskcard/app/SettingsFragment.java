@@ -158,7 +158,7 @@ public class SettingsFragment extends Fragment {
             }
         });
 
-        root.addView(Ui.label(c, "版本 2.0.0 · 原生版"), new LinearLayout.LayoutParams(
+        root.addView(Ui.label(c, "版本 " + BuildConfig.VERSION_NAME + " · 原生版"), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         MaterialButton about = new MaterialButton(c, null,

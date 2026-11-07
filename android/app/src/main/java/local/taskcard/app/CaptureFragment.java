@@ -205,21 +205,28 @@ public class CaptureFragment extends Fragment {
         box.setPadding(pad, pad / 2, pad, 0);
         box.addView(Ui.label(requireContext(), "认出卡片 " + code + " · " + card.optString("title")));
 
-        EditText et = Ui.input(requireContext(), "标题", title, android.text.InputType.TYPE_CLASS_TEXT);
+        // 顺序与纸面一致：任务名称 / 优先级 / 完成标准 / 开始 / 截止 / 材料 / 备注
+        EditText et = Ui.input(requireContext(), "任务名称", title, android.text.InputType.TYPE_CLASS_TEXT);
+        EditText pri = Ui.input(requireContext(), "优先级（重要且紧急 / 重要不紧急 / 紧急不重要 / 其他）",
+                f.optString("priority"), android.text.InputType.TYPE_CLASS_TEXT);
+        EditText dod = Ui.input(requireContext(), "完成标准", f.optString("dod"), android.text.InputType.TYPE_CLASS_TEXT);
+        EditText start = Ui.input(requireContext(), "开始 MM-DD", f.optString("start"), android.text.InputType.TYPE_CLASS_TEXT);
         EditText due = Ui.input(requireContext(), "截止 MM-DD", f.optString("due"), android.text.InputType.TYPE_CLASS_TEXT);
-        EditText est = Ui.input(requireContext(), "用时（分）", f.optString("estimate_min"), android.text.InputType.TYPE_CLASS_NUMBER);
         EditText mat = Ui.input(requireContext(), "材料", f.optString("materials"), android.text.InputType.TYPE_CLASS_TEXT);
         EditText notes = Ui.input(requireContext(), "备注", f.optString("notes"), android.text.InputType.TYPE_CLASS_TEXT);
+        EditText goal = Ui.input(requireContext(), "目标（长期卡）", f.optString("goal"), android.text.InputType.TYPE_CLASS_TEXT);
         box.addView(Ui.label(requireContext(), "标题"));
         box.addView(et);
-        box.addView(Ui.label(requireContext(), "截止"));
+        box.addView(Ui.label(requireContext(), "优先级 / 完成标准 / 开始 / 截止"));
+        box.addView(pri);
+        box.addView(dod);
+        box.addView(start);
         box.addView(due);
-        box.addView(Ui.label(requireContext(), "用时"));
-        box.addView(est);
         box.addView(Ui.label(requireContext(), "材料"));
         box.addView(mat);
         box.addView(Ui.label(requireContext(), "备注"));
         box.addView(notes);
+        box.addView(goal);
 
         new MaterialAlertDialogBuilder(requireContext())
                 .setTitle("认出来了，核对一下")
@@ -229,8 +236,10 @@ public class CaptureFragment extends Fragment {
                         JSONObject body = new JSONObject();
                         if (!title.trim().isEmpty()) body.put("title", title.trim());
                         if (!due.getText().toString().trim().isEmpty()) body.put("due", due.getText().toString().trim());
-                        String e = est.getText().toString().trim();
-                        if (!e.isEmpty()) body.put("estimate_min", Integer.parseInt(e));
+                        if (!pri.getText().toString().trim().isEmpty()) body.put("priority", pri.getText().toString().trim());
+                        if (!dod.getText().toString().trim().isEmpty()) body.put("dod", dod.getText().toString().trim());
+                        if (!start.getText().toString().trim().isEmpty()) body.put("start", start.getText().toString().trim());
+                        if (!goal.getText().toString().trim().isEmpty()) body.put("goal", goal.getText().toString().trim());
                         if (!mat.getText().toString().trim().isEmpty()) body.put("materials", mat.getText().toString().trim());
                         if (!notes.getText().toString().trim().isEmpty()) body.put("notes", notes.getText().toString().trim());
                         Api.patch(requireContext(), "/api/collections/tasks/records/" + taskId, body, new Api.Cb() {
