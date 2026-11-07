@@ -21,6 +21,27 @@ export function Detail({ id }: { id: string }) {
   const [code, setCode] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [plan, setPlan] = useState({ priority: '', dod: '', start: '', weekly_hours: '' });
+
+  useEffect(() => {
+    if (!task) return;
+    setPlan({
+      priority: task.priority ?? '',
+      dod: task.dod ?? '',
+      start: task.start ?? '',
+      weekly_hours: task.weekly_hours ? String(task.weekly_hours) : '',
+    });
+  }, [task]);
+
+  async function savePlan(patch: Record<string, unknown>) {
+    if (!task) return;
+    try {
+      await update(task.id, patch);
+      setFlash('已保存');
+    } catch (e) {
+      setFlash(message(e));
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -126,31 +147,65 @@ export function Detail({ id }: { id: string }) {
             {flash && <p className="text-[11px] text-oncanvas/45">{flash}</p>}
           </section>
 
-          {(task.priority || task.dod || task.start || task.weekly_hours) && (
-            <section className="space-y-1.5">
-              <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">卡面上的规划</h2>
-              {task.priority && (
-                <p className="text-[12px] text-oncanvas/70">
-                  优先级 <span className="text-oncanvas">{task.priority}</span>
-                </p>
-              )}
-              {task.dod && (
-                <p className="text-[12px] text-oncanvas/70">
-                  完成标准 <span className="text-oncanvas">{task.dod}</span>
-                </p>
-              )}
-              {task.start && (
-                <p className="text-[12px] text-oncanvas/70">
-                  开始 <span className="text-oncanvas">{task.start}</span>
-                </p>
-              )}
-              {task.weekly_hours ? (
-                <p className="text-[12px] text-oncanvas/70">
-                  每周投入 <span className="text-oncanvas">{task.weekly_hours} 小时</span>
-                </p>
-              ) : null}
-            </section>
-          )}
+          <section className="space-y-1.5">
+              <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">
+                卡面上的规划
+                <span className="ml-2 text-[10px] tracking-normal text-oncanvas/30">改完点空白处就存</span>
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-[11px] text-oncanvas/45">
+                  优先级
+                  <select
+                    value={plan.priority}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setPlan((p) => ({ ...p, priority: v }));
+                      void savePlan({ priority: v });
+                    }}
+                    className="mt-1 w-full border border-line/20 bg-canvas px-2 py-1.5 text-[12px] text-oncanvas outline-none focus:border-line/50"
+                  >
+                    <option value="">（没写）</option>
+                    <option>重要且紧急</option>
+                    <option>重要不紧急</option>
+                    <option>紧急不重要</option>
+                    <option>其他</option>
+                  </select>
+                </label>
+                <label className="block text-[11px] text-oncanvas/45">
+                  开始（MM-DD）
+                  <input
+                    value={plan.start}
+                    onChange={(e) => setPlan((p) => ({ ...p, start: e.target.value }))}
+                    onBlur={() => void savePlan({ start: plan.start.trim() })}
+                    placeholder="11-08"
+                    className="mt-1 w-full border border-line/20 bg-canvas px-2 py-1.5 font-mono text-[12px] text-oncanvas outline-none focus:border-line/50"
+                  />
+                </label>
+                <label className="block text-[11px] text-oncanvas/45 sm:col-span-2">
+                  完成标准
+                  <input
+                    value={plan.dod}
+                    onChange={(e) => setPlan((p) => ({ ...p, dod: e.target.value }))}
+                    onBlur={() => void savePlan({ dod: plan.dod.trim() })}
+                    placeholder="做到什么程度算完"
+                    className="mt-1 w-full border border-line/20 bg-canvas px-2 py-1.5 text-[12px] text-oncanvas outline-none focus:border-line/50"
+                  />
+                </label>
+                {task.kind === 'long' && (
+                  <label className="block text-[11px] text-oncanvas/45">
+                    每周投入（小时）
+                    <input
+                      value={plan.weekly_hours}
+                      inputMode="decimal"
+                      onChange={(e) => setPlan((p) => ({ ...p, weekly_hours: e.target.value }))}
+                      onBlur={() => void savePlan({ weekly_hours: Number(plan.weekly_hours) || 0 })}
+                      placeholder="6"
+                      className="mt-1 w-full border border-line/20 bg-canvas px-2 py-1.5 font-mono text-[12px] text-oncanvas outline-none focus:border-line/50"
+                    />
+                  </label>
+                )}
+              </div>
+          </section>
 
           {task.kind === 'long' && (
             <section className="flex flex-col gap-2">

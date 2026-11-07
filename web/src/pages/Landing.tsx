@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { TaskSheet } from '../components/TaskSheet';
 import { logProgress, message, useShortLink, useUpdateTask } from '../lib/data';
-import { Link, navigate } from '../lib/router';
+import { Link } from '../lib/router';
 import { STATUS_LABEL, type Status } from '../lib/types';
 import { fileToJpegDataUrl } from '../lib/image';
 
@@ -10,6 +10,7 @@ export function Landing({ code }: { code: string }) {
   const update = useUpdateTask();
   const [pending, setPending] = useState<Status | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [done, setDone] = useState<{ title: string; hint: string } | null>(null);
   const [note, setNote] = useState('');
   const [reviewing, setReviewing] = useState(false);
   const [review, setReview] = useState('');
@@ -26,6 +27,7 @@ export function Landing({ code }: { code: string }) {
     try {
       await update(task.id, { status });
       setFlash(`已标记为「${STATUS_LABEL[status]}」`);
+      setDone({ title: `已标记为「${STATUS_LABEL[status]}」`, hint: '看板上已经同步，不用刷新。' });
     } catch (e) {
       setFlash(`没改成：${message(e)}`);
     } finally {
@@ -43,6 +45,7 @@ export function Landing({ code }: { code: string }) {
       setReviewing(false);
       setReview('');
       setFlash('做完了，纸卡可以收进文件夹了');
+      setDone({ title: '这张卡做完了', hint: '看板上已经进「已完成」，纸卡可以收进文件夹。' });
     } catch (e) {
       setFlash(`没改成：${message(e)}`);
     } finally {
@@ -135,6 +138,8 @@ export function Landing({ code }: { code: string }) {
       await update(task.id, payload);
       setFields(null);
       setFlash('已经写回这张卡，看板同步更新了');
+      setDone({ title: '已写回这张卡', hint: '看板、全部任务里都是新内容了。' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (e) {
       setFlash(`没写回去：${message(e)}`);
     } finally {
@@ -168,10 +173,15 @@ export function Landing({ code }: { code: string }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-canvas px-4 py-8">
       <div className="w-full max-w-[420px]">
-        <div className="mb-3 flex items-center justify-between px-1 font-mono text-[10px] tracking-[0.2em] text-oncanvas/40">
-          <span>任务卡片 · 扫码</span>
-          <span className="text-oncanvas/60">{code}</span>
-        </div>
+        <header className="sticky top-0 z-10 -mx-1 mb-3 flex items-center justify-between bg-canvas/95 px-1 py-2 backdrop-blur">
+          <Link
+            to="/"
+            className="flex items-center gap-1 text-[12px] text-oncanvas/70 hover:text-oncanvas"
+          >
+            <span aria-hidden>←</span> 回看板
+          </Link>
+          <span className="font-mono text-[10px] tracking-[0.2em] text-oncanvas/40">{code}</span>
+        </header>
 
         {loading && <div className="h-[380px] animate-pulse bg-oncanvas/10" />}
 
@@ -213,6 +223,28 @@ export function Landing({ code }: { code: string }) {
 
         {task && (
           <TaskSheet task={task} code={code} scans={link?.scans} lastScan={link?.last_scan_at} />
+        )}
+
+        {done && (
+          <section className="mt-3 border border-moss/40 bg-surface px-4 py-3.5 text-ink">
+            <p className="text-[13px] font-semibold">{done.title}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">{done.hint}</p>
+            <div className="mt-3 flex gap-2">
+              <Link
+                to="/"
+                className="flex-1 bg-seal px-3 py-2.5 text-center text-[13px] font-medium text-white"
+              >
+                回看板
+              </Link>
+              <button
+                type="button"
+                onClick={() => setDone(null)}
+                className="border border-ink/20 px-3 py-2.5 text-[12px] text-ink-soft hover:border-ink/40"
+              >
+                留在这页
+              </button>
+            </div>
+          </section>
         )}
 
         {task?.kind === 'long' && (
@@ -262,7 +294,13 @@ export function Landing({ code }: { code: string }) {
 
         {task && !fields && (
           <div className="mt-4 flex flex-col gap-2">
-            <label className={`flex w-full cursor-pointer items-center justify-center gap-2 bg-seal px-4 py-4 text-[15px] font-semibold tracking-[0.06em] text-white transition-colors hover:bg-seal/90 ${scanning ? 'opacity-60' : ''}`}>
+            <label
+              className={
+                done
+                  ? `flex w-full cursor-pointer items-center justify-center gap-2 border border-line/25 px-4 py-3.5 text-[13px] text-oncanvas/80 transition-colors hover:border-line/50 ${scanning ? 'opacity-60' : ''}`
+                  : `flex w-full cursor-pointer items-center justify-center gap-2 bg-seal px-4 py-4 text-[15px] font-semibold tracking-[0.06em] text-white transition-colors hover:bg-seal/90 ${scanning ? 'opacity-60' : ''}`
+              }
+            >
               <input
                 type="file"
                 accept="image/*"
@@ -481,7 +519,7 @@ export function Landing({ code }: { code: string }) {
 
         {task && (
           <div className="mt-3 flex items-center justify-between gap-3 px-1 text-[11px] text-oncanvas/40">
-            <span>{flash ?? '点一下，网页和纸卡就同步了'}</span>
+            <span>{done ? '纸卡和网页已经是同一份数据了' : flash ?? '点一下，网页和纸卡就同步了'}</span>
             <Link
               to={`/tasks/${task.id}`}
               className="shrink-0 underline decoration-oncanvas/25 underline-offset-4"
@@ -491,15 +529,13 @@ export function Landing({ code }: { code: string }) {
           </div>
         )}
 
-        <p className="mt-8 text-center text-[10px] tracking-[0.18em] text-oncanvas/25">
-          <button
-            type="button"
-            className="underline-offset-4 hover:underline"
-            onClick={() => navigate('/')}
-          >
-            任务卡片 · 一叠纸 + 一个网页
-          </button>
-        </p>
+        <nav className="mt-6 flex items-center justify-center gap-4 text-[11px] text-oncanvas/45">
+          <Link to="/" className="hover:text-oncanvas/80">看板</Link>
+          <span aria-hidden className="text-oncanvas/20">/</span>
+          <Link to="/tasks" className="hover:text-oncanvas/80">全部任务</Link>
+          <span aria-hidden className="text-oncanvas/20">/</span>
+          <Link to="/cards" className="hover:text-oncanvas/80">卡片</Link>
+        </nav>
       </div>
     </div>
   );

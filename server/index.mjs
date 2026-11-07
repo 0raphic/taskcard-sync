@@ -6,6 +6,7 @@ import { existsSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import os from 'node:os';
+import { join } from 'node:path';
 import path from 'node:path';
 import dotenv from 'dotenv';
 
@@ -790,6 +791,69 @@ app.post('/ds-api/cards.blank', async (req, res) => {
   }
 });
 
+
+// 导出全部任务数据（不含 Key）；出问题时可留档、可导入回另一台机器
+app.get('/ds-api/export', async (req, res) => {
+  try {
+    const [tasks, links, logs] = await Promise.all([
+      pbReq('/api/collections/tasks/records?perPage=500'),
+      pbReq('/api/collections/short_links/records?perPage=500'),
+      pbReq('/api/collections/progress_logs/records?perPage=500'),
+    ]);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '');
+    res.setHeader('content-type', 'application/json; charset=utf-8');
+    res.setHeader('content-disposition', `attachment; filename="taskcard-export-${stamp}.json"`);
+    res.json({
+      app: 'task-card',
+      version: 1,
+      exported_at: new Date().toISOString(),
+      counts: { tasks: tasks.json?.items?.length ?? 0, links: links.json?.items?.length ?? 0 },
+      tasks: tasks.json?.items ?? [],
+      short_links: links.json?.items ?? [],
+      progress_logs: logs.json?.items ?? [],
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// 备份 PocketBase 数据库（zip，存在 pb_data/backups 里，可下载）
+app.post('/ds-api/backup', async (req, res) => {
+  try {
+    const name = String(req.body?.name || '').trim() || `taskcard-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '')}.zip`;
+    const r = await pbReq('/api/backups', { method: 'POST', body: { name } });
+    if (!r.ok) return res.status(502).json({ ok: false, error: r.json?.message || '备份失败' });
+    return res.json({ ok: true, name });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.get('/ds-api/backups', async (req, res) => {
+  try {
+    const r = await pbReq('/api/backups');
+    if (!r.ok) return res.status(r.status || 502).json({ ok: false, error: r.json?.message || '读不到备份列表' });
+    const items = (r.json || []).map((b) => ({ key: b.key, size: b.size, modified: b.modified }));
+    return res.json({ ok: true, items });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.get('/ds-api/backups/:name', async (req, res) => {
+  try {
+    const name = String(req.params.name || '');
+    if (!/^[\w.-]+\.zip$/.test(name)) return res.status(400).json({ ok: false, error: '备份文件名不合法' });
+    // 直接从本机 pb_data/backups 读：PB 的下载接口对 superuser token 校验更严，走文件更稳
+    const file = join(ROOT, 'server', 'pocketbase', 'pb_data', 'backups', name);
+    if (!existsSync(file)) return res.status(404).json({ ok: false, error: '这个备份不在了' });
+    res.setHeader('content-type', 'application/zip');
+    res.setHeader('content-disposition', `attachment; filename="${name}"`);
+    res.send(readFileSync(file));
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 // 读卡面：稳定起见给两次机会（视觉模型偶尔把 token 全花在推理上，content 会是空的）
 async function readCardFields(image, code, cfg) {
