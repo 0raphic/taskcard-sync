@@ -43,6 +43,7 @@ export function Cards() {
   const [busy, setBusy] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [batch] = useState<string[]>(readBatch);
+  const [picked, setPicked] = useState<string[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -126,6 +127,7 @@ export function Cards() {
       });
       await openPdf(res);
       setFlash(`补印 ${codes.length} 张，短码不变`);
+      setPicked([]);
     } catch (e) {
       setFlash(e instanceof Error ? e.message : String(e));
     } finally {
@@ -147,10 +149,24 @@ export function Cards() {
         <div className="flex flex-wrap gap-2">
           <Link
             to="/print"
-            className="bg-seal px-4 py-2 text-[12px] font-medium text-white hover:opacity-90"
+            className={
+              picked.length > 0
+                ? 'border border-line/25 px-4 py-2 text-[12px] text-oncanvas/75 hover:border-line/50'
+                : 'bg-seal px-4 py-2 text-[12px] font-medium text-white hover:opacity-90'
+            }
           >
             打印新空白卡
           </Link>
+          {picked.length > 0 && (
+            <button
+              type="button"
+              onClick={() => reprint(picked)}
+              disabled={busy !== null}
+              className="bg-seal px-4 py-2 text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+            >
+              补印选中的 {picked.length} 张
+            </button>
+          )}
           {batch.length > 0 && (
             <button
               type="button"
@@ -180,7 +196,27 @@ export function Cards() {
             <span className="ml-1 font-mono text-[10px] text-oncanvas/35">{counts[g.key]}</span>
           </button>
         ))}
-        <span className="ml-auto text-[11px] text-oncanvas/35">短码是纸卡的身份证，别改它</span>
+        <div className="ml-auto flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              const alive = shown.filter((r) => r.active !== false).map((r) => r.code);
+              const allPicked = alive.length > 0 && alive.every((c) => picked.includes(c));
+              setPicked(allPicked ? picked.filter((c) => !alive.includes(c)) : Array.from(new Set([...picked, ...alive])));
+            }}
+            className="text-[11px] text-oncanvas/45 hover:text-oncanvas/80"
+          >
+            {shown.length > 0 && shown.filter((r) => r.active !== false).every((r) => picked.includes(r.code))
+              ? '取消选择本组'
+              : `选择本组（${shown.filter((r) => r.active !== false).length}）`}
+          </button>
+          {picked.length > 0 && (
+            <button type="button" onClick={() => setPicked([])} className="text-[11px] text-oncanvas/45 hover:text-oncanvas/80">
+              清空
+            </button>
+          )}
+          <span className="text-[11px] text-oncanvas/30">短码是纸卡的身份证，别改它</span>
+        </div>
       </div>
 
       {flash && <p className="text-[12px] text-oncanvas/60">{flash}</p>}
@@ -203,6 +239,17 @@ export function Cards() {
               key={row.id}
               className={`flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 ${dead ? 'opacity-45' : ''}`}
             >
+              {!dead && (
+                <input
+                  type="checkbox"
+                  checked={picked.includes(row.code)}
+                  onChange={(e) =>
+                    setPicked((prev) => (e.target.checked ? [...prev, row.code] : prev.filter((c) => c !== row.code)))
+                  }
+                  aria-label={`选择 ${row.code}`}
+                  className="h-3.5 w-3.5 shrink-0 accent-seal"
+                />
+              )}
               <span className="font-mono text-[12px] tracking-[0.06em] text-oncanvas/75">{row.code}</span>
               <span
                 className={`text-[10px] tracking-[0.14em] ${
