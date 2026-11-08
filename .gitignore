@@ -1,0 +1,38 @@
+# deps
+node_modules/
+web/node_modules/
+
+# build output
+web/dist/
+
+# secrets
+.env.local
+.env
+
+# PocketBase runtime data & binary
+server/pocketbase/pb_data/
+server/pocketbase/pocketbase.exe
+server/pocketbase/pocketbase
+*.zip
+
+# logs / os junk
+*.log
+.DS_Store
+Thumbs.db
+
+.pnpm-store
+
+# 本地验收产物（截图、CDP 配置）
+.shots/
+.edge-profile/
+android/local.properties
+android/.gradle/
+android/app/build/
+tools/gradle/
+.cache/
+
+# Gradle 缓存（体积大，重建时自动生成）
+gradle-home/
+
+# 签名文件（本地生成，别提交）
+android/taskcard-release.jks

@@ -1,0 +1,19 @@
+{
+  "name": "task-card",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --dir web dev",
+    "build": "pnpm --dir web build",
+    "start": "node server/index.mjs",
+    "pb": "node tools/run-pocketbase.mjs",
+    "seed": "node seed/seed.mjs",
+    "cards": "python scripts/gen_cards.py",
+    "demo": "node scripts/start-demo.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "http-proxy-middleware": "^4.2.1"
+  }
+}

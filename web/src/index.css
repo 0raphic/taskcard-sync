@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+/* 瑞士风：白纸黑字，红色只做强调；浅色为默认，深色是同一套网格的反相 */
+html {
+  /* 页面最底层永远是当前主题的纸色：切换时不会露出浏览器默认的白 */
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+:root {
+  --canvas: #ffffff;
+  --canvas-soft: #f5f5f3;
+  --surface: #ffffff;
+  --surface-dim: #f4f4f1;
+  --ink: #0a0a0a;
+  --ink-soft: #6b6b66;
+  --oncanvas: #0a0a0a;
+  --oncanvas-soft: #6b6b66;
+  --line: rgba(10, 10, 10, 0.16);
+  --rule: #111111;
+  --seal: #d6362b;
+  --moss: #2f6b46;
+  --amber: #b06a00;
+  color-scheme: light;
+  background: var(--canvas);
+  scrollbar-color: rgba(10, 10, 10, 0.3) transparent;
+}
+
+:root[data-theme="dark"] {
+  scrollbar-color: rgba(244, 243, 239, 0.28) transparent;
+  --canvas: #0e0e0d;
+  --canvas-soft: #171716;
+  --surface: #141413;
+  --surface-dim: #1c1c1a;
+  --ink: #f4f3ef;
+  --ink-soft: #9b9a94;
+  --oncanvas: #f4f3ef;
+  --oncanvas-soft: #9b9a94;
+  --line: rgba(244, 243, 239, 0.2);
+  --rule: #f4f3ef;
+  --seal: #ef5347;
+  --moss: #6fae86;
+  --amber: #e0a33a;
+  /* 刻意不切 color-scheme：色板全由 CSS 变量控制，切 UA 模式反而会整页重绘闪一下 */
+  background: var(--canvas);
+}
+
+@theme {
+  --color-canvas: var(--canvas);
+  --color-canvas-soft: var(--canvas-soft);
+  --color-surface: var(--surface);
+  --color-surface-dim: var(--surface-dim);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-oncanvas: var(--oncanvas);
+  --color-oncanvas-soft: var(--oncanvas-soft);
+  --color-line: var(--line);
+  --color-rule: var(--rule);
+  --color-seal: var(--seal);
+  --color-moss: var(--moss);
+  --color-amber: var(--amber);
+
+  --font-sans: "Helvetica Neue", "Inter", "PingFang SC", "Noto Sans SC", "Microsoft YaHei",
+    system-ui, sans-serif;
+  --font-mono: "SF Mono", "Cascadia Mono", ui-monospace, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    background: var(--canvas);
+  }
+  /* 换肤的那一下不跑过渡，避免屏闪 */
+  html.theme-swap *,
+  html.theme-swap *::before,
+  html.theme-swap *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+  body {
+    @apply bg-canvas text-oncanvas font-sans antialiased;
+    font-feature-settings: "tnum" 1;
+  }
+  ::selection {
+    @apply bg-seal text-white;
+  }
+  :focus-visible {
+    outline: 2px solid var(--seal);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* 纸卡的边：瑞士风用实线，和红章一起构成「表格」 */
+  .trim {
+    border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+  .micro {
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .stamp {
+    border: 2px solid color-mix(in srgb, var(--seal) 60%, transparent);
+    padding: 0.05rem 0.45rem;
+    color: color-mix(in srgb, var(--seal) 82%, transparent);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-indent: 0.22em;
+    line-height: 1.2;
+    white-space: nowrap;
+    transform: rotate(-6deg);
+    animation: stamp-in 220ms ease both;
+  }
+  .paper-lift {
+    box-shadow: none;
+  }
+  .ruled {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 1.6rem,
+      color-mix(in srgb, var(--ink) 12%, transparent) 1.6rem,
+      color-mix(in srgb, var(--ink) 12%, transparent) calc(1.6rem + 1px)
+    );
+  }
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.92;
+  }
+}

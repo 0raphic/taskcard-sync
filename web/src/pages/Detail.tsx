@@ -1,0 +1,455 @@
+import { useEffect, useState } from 'react';
+import { TaskSheet } from '../components/TaskSheet';
+import { completeTask, logProgress, message, useTask, useUpdateTask, deleteTask } from '../lib/data';
+import { pb } from '../lib/pb';
+import { fmtDateTime } from '../lib/time';
+import { Link, navigate } from '../lib/router';
+import {
+  STATUSES,
+  STATUS_LABEL,
+  type ChecklistItem,
+  type ProgressLog,
+  type Status,
+  REPEAT_OPTIONS,
+} from '../lib/types';
+
+export function Detail({ id }: { id: string }) {
+  const { task, error } = useTask(id);
+  const update = useUpdateTask();
+  const [logs, setLogs] = useState<ProgressLog[]>([]);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [plan, setPlan] = useState({ priority: '', dod: '', start: '', weekly_hours: '' });
+  const [tagText, setTagText] = useState('');
+  const [remindText, setRemindText] = useState('');
+  const [repeat, setRepeat] = useState('');
+  const [items, setItems] = useState<ChecklistItem[]>([]);
+  const [newItem, setNewItem] = useState('');
+
+  useEffect(() => {
+    if (!task) return;
+    setTagText(task.tags ?? '');
+    setRemindText(task.remind_at ?? '');
+    setRepeat(task.repeat ?? '');
+    setItems(Array.isArray(task.checklist) ? task.checklist : []);
+  }, [task]);
+
+  useEffect(() => {
+    if (!task) return;
+    setPlan({
+      priority: task.priority ?? '',
+      dod: task.dod ?? '',
+      start: task.start ?? '',
+      weekly_hours: task.weekly_hours ? String(task.weekly_hours) : '',
+    });
+  }, [task]);
+
+  async function savePlan(patch: Record<string, unknown>) {
+    if (!task) return;
+    try {
+      await update(task.id, patch);
+      setFlash('已保存');
+    } catch (e) {
+      setFlash(message(e));
+    }
+  }
+
+  async function saveItems(next: ChecklistItem[]) {
+    setItems(next);
+    await savePlan({ checklist: next });
+  }
+
+  function toggleItem(index: number) {
+    void saveItems(items.map((it, i) => (i === index ? { ...it, d: !it.d } : it)));
+  }
+
+  function addItem() {
+    const text = newItem.trim();
+    if (!text) return;
+    setNewItem('');
+    void saveItems([...items, { t: text, d: false }]);
+  }
+
+  function removeItem(index: number) {
+    void saveItems(items.filter((_, i) => i !== index));
+  }
+
+  useEffect(() => {
+    let alive = true;
+    pb.collection('short_links')
+      .getFirstListItem(`task="${id}"`)
+      .then((row) => alive && setCode(String(row.code ?? '')))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    let alive = true;
+    pb.collection('progress_logs')
+      .getFullList<ProgressLog>({ filter: `task="${id}"`, sort: '-at' })
+      .then((rows) => alive && setLogs(rows))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  async function setStatus(status: Status) {
+    setBusy(true);
+    try {
+      if (status === 'done') {
+        const r = await completeTask(id);
+        setFlash(r.next ? `已标记完成，下一张排到 ${r.next.due}` : '已标记完成');
+      } else {
+        await update(id, { status });
+        setFlash(`已改为「${STATUS_LABEL[status]}」`);
+      }
+    } catch (e) {
+      setFlash(message(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setProgress(progress: number) {
+    await update(id, { progress: Math.max(0, Math.min(100, progress)) });
+  }
+
+  async function addNote() {
+    if (!note.trim() || !task) return;
+    setBusy(true);
+    try {
+      const row = await logProgress(task.id, note.trim());
+      setLogs((prev) => [row as unknown as ProgressLog, ...prev]);
+      setNote('');
+    } catch (e) {
+      setFlash(message(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    setDeleting(true);
+    setFlash(null);
+    try {
+      await deleteTask(id);
+      navigate('/tasks');
+    } catch (e) {
+      setFlash(message(e));
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-5">
+      <div className="flex items-center justify-between">
+        <Link to="/" className="text-[12px] text-oncanvas/50 hover:text-oncanvas">
+          ← 看板
+        </Link>
+        <span className="font-mono text-[10px] text-oncanvas/25">
+          {code ? <>短码 {code}</> : id}
+        </span>
+      </div>
+
+      {error && <p className="text-[13px] text-seal">{error}</p>}
+      {!task && !error && <div className="h-[360px] animate-pulse bg-oncanvas/10" />}
+
+      {task && (
+        <>
+          <TaskSheet task={task} />
+
+          <section className="flex flex-col gap-2">
+            <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">改状态</h2>
+            <div className="grid grid-cols-4 gap-2">
+              {STATUSES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setStatus(s)}
+                  className={`border px-2 py-2.5 text-[12px] transition-colors disabled:opacity-50 ${
+                    task.status === s
+                      ? 'border-seal bg-seal/15 text-oncanvas'
+                      : 'border-line/20 text-oncanvas/70 hover:border-line/45'
+                  }`}
+                >
+                  {STATUS_LABEL[s]}
+                </button>
+              ))}
+            </div>
+            {flash && <p className="text-[11px] text-oncanvas/45">{flash}</p>}
+          </section>
+
+          <section className="space-y-1.5">
+              <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">
+                卡面上的规划
+                <span className="ml-2 text-[10px] tracking-normal text-oncanvas/30">改完点空白处自动保存</span>
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-[11px] text-oncanvas/45">
+                  优先级
+                  <select
+                    value={plan.priority}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setPlan((p) => ({ ...p, priority: v }));
+                      void savePlan({ priority: v });
+                    }}
+                    className="mt-1 w-full border border-line/20 bg-canvas px-2 py-1.5 text-[12px] text-oncanvas outline-none focus:border-line/50"
+                  >
+                    <option value="">（没写）</option>
+                    <option>重要且紧急</option>
+                    <option>重要不紧急</option>
+                    <option>紧急不重要</option>
+                    <option>其他</option>
+                  </select>
+                </label>
+                <label className="block text-[11px] text-oncanvas/45">
+                  开始（MM-DD）
+                  <input
+                    value={plan.start}
+                    onChange={(e) => setPlan((p) => ({ ...p, start: e.target.value }))}
+                    onBlur={() => void savePlan({ start: plan.start.trim() })}
+                    placeholder="11-08"
+                    className="mt-1 w-full border border-line/20 bg-canvas px-2 py-1.5 font-mono text-[12px] text-oncanvas outline-none focus:border-line/50"
+                  />
+                </label>
+                <label className="block text-[11px] text-oncanvas/45 sm:col-span-2">
+                  完成标准
+                  <input
+                    value={plan.dod}
+                    onChange={(e) => setPlan((p) => ({ ...p, dod: e.target.value }))}
+                    onBlur={() => void savePlan({ dod: plan.dod.trim() })}
+                    placeholder="做到什么程度算完"
+                    className="mt-1 w-full border border-line/20 bg-canvas px-2 py-1.5 text-[12px] text-oncanvas outline-none focus:border-line/50"
+                  />
+                </label>
+                {task.kind === 'long' && (
+                  <label className="block text-[11px] text-oncanvas/45">
+                    每周投入（小时）
+                    <input
+                      value={plan.weekly_hours}
+                      inputMode="decimal"
+                      onChange={(e) => setPlan((p) => ({ ...p, weekly_hours: e.target.value }))}
+                      onBlur={() => void savePlan({ weekly_hours: Number(plan.weekly_hours) || 0 })}
+                      placeholder="6"
+                      className="mt-1 w-full border border-line/20 bg-canvas px-2 py-1.5 font-mono text-[12px] text-oncanvas outline-none focus:border-line/50"
+                    />
+                  </label>
+                )}
+              </div>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">标签</h2>
+            <input
+              value={tagText}
+              onChange={(e) => setTagText(e.target.value)}
+              onBlur={() => void savePlan({ tags: tagText.trim() })}
+              placeholder="逗号分隔，例如：论文, 实验, 这周"
+              className="w-full border border-line/20 bg-transparent px-3 py-2 text-[12.5px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/50"
+            />
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="flex items-baseline gap-2 text-[11px] tracking-[0.18em] text-oncanvas/45">
+              提醒
+              <span className="font-mono text-[10px] tracking-normal text-oncanvas/30">浏览器通知 / App 到点提醒</span>
+            </h2>
+            <input
+              value={remindText}
+              onChange={(e) => setRemindText(e.target.value)}
+              onBlur={() => void savePlan({ remind_at: remindText.trim() })}
+              placeholder="MM-DD HH:mm，例如 11-08 09:00（留空不提醒）"
+              className="w-full border border-line/20 bg-transparent px-3 py-2 text-[12.5px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/50"
+            />
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="flex items-baseline gap-2 text-[11px] tracking-[0.18em] text-oncanvas/45">
+              重复
+              <span className="font-mono text-[10px] tracking-normal text-oncanvas/30">完成时自动生成下一张</span>
+            </h2>
+            <select
+              value={repeat}
+              onChange={(e) => {
+                setRepeat(e.target.value);
+                void savePlan({ repeat: e.target.value });
+              }}
+              className="w-full border border-line/20 bg-transparent px-3 py-2 text-[12.5px] text-oncanvas focus:border-line/50"
+            >
+              {REPEAT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="flex items-baseline gap-2 text-[11px] tracking-[0.18em] text-oncanvas/45">
+              清单
+              <span className="font-mono text-[10px] tracking-normal text-oncanvas/30">
+                {items.filter((i) => i.d).length}/{items.length}
+              </span>
+            </h2>
+            <ul className="flex flex-col divide-y divide-line/40 border-y border-line/15">
+              {items.map((it, i) => (
+                <li key={`${it.t}-${i}`} className="flex items-center gap-3 py-2">
+                  <button
+                    type="button"
+                    aria-label={it.d ? '标记为未完成' : '标记为完成'}
+                    onClick={() => toggleItem(i)}
+                    className={`grid h-4 w-4 shrink-0 place-items-center border ${
+                      it.d ? 'border-ink bg-ink text-canvas' : 'border-ink/35'
+                    }`}
+                  >
+                    {it.d && <span className="text-[10px] leading-none">✓</span>}
+                  </button>
+                  <span
+                    className={`flex-1 text-[12.5px] ${
+                      it.d ? 'text-oncanvas/35 line-through' : 'text-oncanvas/80'
+                    }`}
+                  >
+                    {it.t}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(i)}
+                    className="text-[11px] text-oncanvas/30 hover:text-seal"
+                  >
+                    删除
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              <input
+                value={newItem}
+                onChange={(e) => setNewItem(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addItem()}
+                placeholder="加一条小步骤，回车保存"
+                className="flex-1 border border-line/20 bg-transparent px-3 py-2 text-[12.5px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/50"
+              />
+              <button
+                type="button"
+                disabled={!newItem.trim()}
+                onClick={addItem}
+                className="border border-line/25 px-3 text-[12px] text-oncanvas/80 hover:border-ink disabled:opacity-40"
+              >
+                加上
+              </button>
+            </div>
+          </section>
+
+          {task.kind === 'long' && (
+            <section className="flex flex-col gap-2">
+              <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">进度</h2>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setProgress((task.progress ?? 0) - 10)}
+                  className="h-8 w-8 border border-line/20 text-oncanvas/70 hover:border-line/45"
+                >
+                  −
+                </button>
+                <span className="w-14 text-center font-mono text-[15px]">{task.progress ?? 0}%</span>
+                <button
+                  type="button"
+                  onClick={() => setProgress((task.progress ?? 0) + 10)}
+                  className="h-8 w-8 border border-line/20 text-oncanvas/70 hover:border-line/45"
+                >
+                  +
+                </button>
+              </div>
+            </section>
+          )}
+
+          <section className="flex flex-col gap-2">
+            <h2 className="text-[11px] tracking-[0.18em] text-oncanvas/45">进展记录</h2>
+            <div className="flex gap-2">
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addNote()}
+                placeholder="今天推进到哪了？"
+                className="flex-1 border border-line/20 bg-transparent px-3 py-2 text-[13px] text-oncanvas placeholder:text-oncanvas/25 focus:border-line/40"
+              />
+              <button
+                type="button"
+                disabled={busy || !note.trim()}
+                onClick={addNote}
+                className="border border-line/25 px-4 text-[12px] text-oncanvas/80 hover:border-line/50 disabled:opacity-40"
+              >
+                记一笔
+              </button>
+            </div>
+            {logs.length === 0 ? (
+              <p className="text-[11px] text-oncanvas/30">还没有进展记录。</p>
+            ) : (
+              <ul className="flex flex-col divide-y divide-line/40">
+                {logs.map((row) => (
+                  <li key={row.id} className="flex items-baseline gap-3 py-2">
+                    <span className="shrink-0 font-mono text-[10px] text-oncanvas/30">
+                      {fmtDateTime(row.at)}
+                    </span>
+                    <span className="text-[12.5px] text-oncanvas/75">{row.note}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="mt-2 flex flex-col gap-2 border border-seal/25 px-4 py-3">
+            <h2 className="text-[11px] tracking-[0.18em] text-seal/80">删除</h2>
+            {!confirming ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setConfirming(true)}
+                  className="border border-seal/45 px-3 py-2 text-[12px] text-seal/90 hover:border-seal hover:bg-seal/10"
+                >
+                  删除这张任务卡
+                </button>
+                <span className="text-[11px] text-oncanvas/35">删除后无法恢复，对应的纸卡也会同时失效。</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <p className="text-[12px] leading-relaxed text-oncanvas/60">
+                  会一起删掉：短码 <span className="font-mono text-oncanvas/80">{code || '（还没生成）'}</span>、
+                  {logs.length} 条进展记录。已经打印出去的纸卡扫这个码会显示「已经不在系统里」。
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={remove}
+                    disabled={deleting}
+                    className="bg-seal px-4 py-2 text-[12px] font-medium text-white hover:brightness-110 disabled:opacity-50"
+                  >
+                    {deleting ? '删除中…' : '确认删除'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(false)}
+                    disabled={deleting}
+                    className="border border-line/25 px-4 py-2 text-[12px] text-oncanvas/70 hover:border-line/45 disabled:opacity-40"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+

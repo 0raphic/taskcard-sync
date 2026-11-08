@@ -1,0 +1,4 @@
+packages:
+  - web
+minimumReleaseAgeExclude:
+  - tailwindcss@4.3.5
